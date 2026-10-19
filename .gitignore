@@ -1,0 +1,23 @@
+build/
+dist/
+.DS_Store
+
+# Local verification, migration and early protocol experiments.
+/项目记录/
+/Experiments/
+
+# Generated distributions and diagnostics.
+*.app/
+*.dmg
+*.zip
+*.log
+
+# Signing credentials must never be committed.
+*.p12
+*.p8
+*.pem
+*.key
+*.mobileprovision
+*.provisionprofile
+.env
+.env.*

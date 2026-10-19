@@ -1,0 +1,31 @@
+手机键盘 0.2.0 源码
+
+需要完整 Xcode 或支持本项目 API 的 Xcode 命令行工具。
+
+构建 Universal App（arm64 + x86_64，最低 macOS 12.0）：
+  zsh build.sh
+
+制作带 Applications 快捷方式的 DMG：
+  zsh package.sh
+
+也可以为已有 App 打包：
+  zsh package.sh /绝对路径/手机键盘-0.2.0-通用版.dmg /绝对路径/手机键盘.app
+
+签名：
+默认使用 ad-hoc 签名，仅适合开发检查。可以设置 MACPHONEKEYS_SIGN_IDENTITY 为钥匙串中已有证书的完整名称，再运行上述脚本。
+Apple Development 证书不是 Developer ID 发行证书。脚本不会创建证书、上传 App 或自动提交公证。正式下载发行需要已有 Developer ID Application 证书与 Apple 公证凭据。
+
+重建图标：
+  swift scripts/generate-icon.swift
+图标脚本的输出位置参见脚本参数说明；已附 AppIcon.icns 和所有尺寸的源 PNG。
+
+本项目保留了传统蓝牙诊断后端，但默认使用实机成功的 BLE 路径。
+命令行参数 --diagnostics 显示连接方式实验入口；普通用户无需使用。
+
+离线检查（先 mkdir -p build）：
+  xcrun swiftc Sources/KeyMapping.swift Tests/KeyMappingTests.swift -o build/KeyMappingTests
+  ./build/KeyMappingTests
+  xcrun swiftc -parse-as-library Sources/BLEKeyboard.swift Tests/BLEInputReportQueueTests.swift -o build/BLEInputReportQueueTests -framework CoreBluetooth
+  ./build/BLEInputReportQueueTests
+  xcrun swiftc -D HID_SDP_TESTS -parse-as-library Sources/BluetoothKeyboard.swift Tests/SDPTests.swift -o build/SDPTests -framework Foundation -framework IOBluetooth
+  ./build/SDPTests

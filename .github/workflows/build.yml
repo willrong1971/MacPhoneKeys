@@ -1,0 +1,30 @@
+name: Build and offline checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate resources and run offline checks
+        run: zsh scripts/check.sh
+      - name: Build Universal App
+        env:
+          MACPHONEKEYS_SIGN_IDENTITY: "-"
+        run: zsh build.sh
