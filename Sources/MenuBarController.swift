@@ -8,7 +8,7 @@ private final class CapturePanel: NSPanel {
 
 final class MenuBarController: NSObject, NSMenuDelegate {
     weak var controller: AppDelegate?
-    let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    let statusItem = NSStatusBar.system.statusItem(withLength: 38)
     let panel: NSPanel
     let surface = KeyboardSurface()
     private let menu = NSMenu()
@@ -42,6 +42,8 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             button.target = self
             button.action = #selector(clicked(_:))
             button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+            button.imagePosition = .imageOnly
+            button.imageScaling = .scaleNone
             button.setAccessibilityLabel(L("手机键盘"))
         }
         menu.delegate = self
@@ -71,11 +73,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         guard let controller else { return }
         let active = controller.capturing
         let state = active ? L("正在向 iPhone 输入") : L("本机输入")
-        let image = NSImage(systemSymbolName: active ? "iphone.circle.fill" : "iphone.circle", accessibilityDescription: state)
-        image?.isTemplate = true
-        statusItem.button?.image = image
+        statusItem.button?.image = MenuBarIcon.image(active: active)
         // Keep the inactive outline visible in both light and dark menu bars.
-        statusItem.button?.alphaValue = active ? 1 : 0.5
+        statusItem.button?.alphaValue = active ? 1 : 0.78
         statusItem.button?.setAccessibilityValue(state)
         statusItem.button?.toolTip = LF("%@ · 点击切换 · ⌃⌥K · 右键打开完整设置", state)
         toggleItem.title = active || controller.captureActivation.pending != nil ? L("停止手机输入") : L("开始手机输入")
@@ -114,6 +114,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     func showCapturePanel() {
         previousApplication = NSWorkspace.shared.frontmostApplication
         if previousApplication?.processIdentifier == ProcessInfo.processInfo.processIdentifier { previousApplication = nil }
+        let showsHint = controller?.preferences.showsInputHint ?? true
+        // Keep a real, visible responder for keyboard events. A 1-point clear
+        // window receives keyboard focus but never draws a hint or intercepts clicks.
+        panel.setContentSize(showsHint ? NSSize(width: 360, height: 104) : NSSize(width: 1, height: 1))
+        panel.hasShadow = showsHint
+        panel.ignoresMouseEvents = !showsHint
+        surface.needsDisplay = true
         if let button = statusItem.button, let buttonWindow = button.window {
             let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
             let screen = buttonWindow.screen ?? NSScreen.main

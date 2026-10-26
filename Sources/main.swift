@@ -49,6 +49,11 @@ final class KeyboardSurface: NSView {
     override func draw(_ dirtyRect: NSRect) {
         let active = controller?.capturing == true
         if isCompact {
+            if controller?.preferences.showsInputHint == false {
+                NSColor.clear.setFill()
+                bounds.fill(using: .copy)
+                return
+            }
             NSColor.windowBackgroundColor.setFill()
             NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
             let style = NSMutableParagraphStyle(); style.alignment = .center
@@ -110,6 +115,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var transportGeneration = UUID()
     var window: NSWindow!
     var menuBar: MenuBarController!
+    var preferences = AppPreferences()
+    var inputHintCheckbox: NSButton!
     var globalHotKey: GlobalHotKey?
     weak var captureSurface: KeyboardSurface?
     var endingCapture = false
@@ -295,6 +302,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         let inputButtons = NSStackView(views: [captureButton, testButton, languageButton, countLabel]); inputButtons.spacing = 10
         stack.addArrangedSubview(inputButtons)
         stack.addArrangedSubview(label(L("中文使用 iPhone 的输入法。按 Esc 或切到其他窗口，即可停止输入。"), color: .secondaryLabelColor))
+        inputHintCheckbox = NSButton(checkboxWithTitle: L("显示输入提示浮窗"), target: self, action: #selector(toggleInputHint))
+        inputHintCheckbox.state = preferences.showsInputHint ? .on : .off
+        let hintPreference = NSStackView(views: [inputHintCheckbox, label(L("关闭后，仅通过菜单栏图标显示输入状态。"), size: 12, color: .secondaryLabelColor)])
+        hintPreference.orientation = .vertical
+        hintPreference.alignment = .leading
+        hintPreference.spacing = 3
+        stack.addArrangedSubview(hintPreference)
 
         let logTitle = NSStackView(views: [label(L("连接记录"), weight: .medium), button(L("打开记录文件"), #selector(openLog))]); logTitle.spacing = 12
         stack.addArrangedSubview(logTitle)
@@ -509,6 +523,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         toggleMenuBarCapture()
     }
 
+    @objc func toggleInputHint() {
+        endCapture()
+        preferences.showsInputHint = inputHintCheckbox.state == .on
+        menuBar.update()
+        writeState()
+    }
+
     func toggleMenuBarCapture(fromHotKey: Bool = false) {
         if capturing || captureActivation.pending != nil { endCapture(restoreFocus: true); return }
         guard isConnected, !isTesting else { showSettings(); return }
@@ -707,6 +728,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                   "inputPanelVisible": menuBar?.panel.isVisible ?? false,
                                   "inputPanelKey": menuBar?.panel.isKeyWindow ?? false,
                                   "appActive": NSApp.isActive,
+                                  "showsInputHint": preferences.showsInputHint,
+                                  "hintWindowVisible": preferences.showsInputHint && (menuBar?.panel.isVisible ?? false),
+                                  "inputPanelWidth": Double(menuBar?.panel.frame.width ?? 0),
+                                  "inputPanelHeight": Double(menuBar?.panel.frame.height ?? 0),
                                   "updatedAt": ISO8601DateFormatter().string(from: Date())]
         if let preview = transport as? PreviewKeyboardTransport {
             // Aggregate fixture diagnostics only; never save characters or key codes.

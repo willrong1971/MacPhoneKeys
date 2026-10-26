@@ -1,11 +1,12 @@
-MacPhoneKeys 0.4.1 (7) — Installation and usage
+MacPhoneKeys 0.5.0 (8) — Installation and usage
 Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
 
 Use a Mac keyboard to type on an iPhone over Bluetooth. The devices may use
 different Apple IDs. No iPhone app is required.
 
-The app stays in the menu bar without a Dock icon. Left-click its app
-icon or press Control + Option + K to toggle iPhone input. The icon becomes
+The app stays in the menu bar without a Dock icon. It uses a wider vector
+keyboard → phone icon with thicker lines. Left-click the icon or press
+Control + Option + K to toggle iPhone input. The icon becomes
 filled only after capture gains input focus; a gray outline means local Mac input. The icon does
 not prove that text appeared on the phone.
 
@@ -24,13 +25,14 @@ interface does not switch immediately. This setting does not change the
 iPhone's input method or hardware-keyboard layout.
 
 INSTALLATION
-1. Open 手机键盘-0.4.1-通用版.dmg and drag the app to Applications.
+1. Open 手机键盘-0.5.0-通用版.dmg and drag the app to Applications.
 2. Open the app from Applications and allow Bluetooth access when prompted.
 3. Eject the disk image after installation. Run only one copy of the app.
 
-Version 0.4.1 (7) fixes activation and focus when starting input with full
-settings closed. Local preview and offline checks are still in progress;
-this version has not completed phone-side typing validation.
+Version 0.5.0 (8) revises the menu bar icon and adds a saved Show input hint
+window setting. The user confirmed phone typing with both full settings and
+the hint turned off: abc123 appeared completely, the icon and stop controls
+worked normally, and no hint window appeared.
 
 To build from source, follow README.en.md at:
 https://github.com/willrong1971/MacPhoneKeys/blob/main/README.en.md
@@ -44,10 +46,10 @@ PAIRING AND TYPING
    the insertion cursor is visible. Use an English/US hardware-keyboard layout
    for the first literal English test.
 4. Once connected, left-click the menu bar icon or press Control + Option + K.
-   Wait for the small input panel to gain focus and the icon to become filled
-   before typing.
-5. Press Esc, click the icon again, or switch to another Mac window to stop
-   relaying input and request key release.
+   Wait for the icon to become filled before typing. The input hint window is
+   shown by default; you can turn it off in full settings.
+5. Press Esc, press the shortcut again, click the icon again, or switch to
+   another Mac window to stop relaying input and request key release.
 
 If you use an external Bluetooth keyboard, keep it connected to the Mac.
 It can supply the key events relayed by this app, just as the Mac's built-in
@@ -57,13 +59,16 @@ MENU BAR AND FULL SETTINGS
 Right-click the icon for “Start phone input” / “Stop phone input”,
 “Full Settings…”, help and quit.
 Full settings retains pairing, connection diagnostics, logs, English test text
-and input-method controls. The small input panel appears only during capture;
-leaving it stops capture automatically.
-Start Typing in full settings also opens the small panel. Alternatively, click
-the original input area in full settings to capture keystrokes there.
-Full settings can stay closed during normal use. In 0.4.1, a shortcut or icon
-action from another Mac app waits for the app to activate and the input panel
-to gain focus before capture begins. Cancellation or focus loss invalidates
+and input-method controls. Show input hint window is enabled by default, and
+your choice is saved. When turned off, input still works and only the menu
+bar icon indicates its state. Esc, the shortcut again, or losing focus still
+stops capture.
+Start Typing in full settings follows the same hint-window setting.
+Alternatively, click the original input area in full settings to capture
+keystrokes there.
+Full settings can stay closed during normal use. A shortcut or icon action
+from another Mac app waits for the app to activate and gain keyboard focus
+before capture begins. Cancellation or focus loss invalidates
 pending activation; a late event cannot restart input.
 If another program has claimed Control + Option + K, the app reports the
 shortcut conflict. Use the icon or its menu to start and stop input instead.
@@ -73,6 +78,7 @@ CONTROLS (SIMPLIFIED CHINESE / ENGLISH INTERFACES)
 停止手机输入             Stop phone input
 完整设置…                Full Settings…
 开始输入                 Start Typing
+显示输入提示浮窗          Show input hint window
 停止输入（Esc）           Stop Typing (Esc)
 蓝牙键盘已连接            Bluetooth Keyboard Connected
 启动蓝牙键盘              Start Keyboard Service
@@ -116,11 +122,13 @@ The Mac must support the required Bluetooth peripheral operation.
 Typing with version 0.2.0 has been confirmed on one Apple silicon Mac running macOS 26.6.2 and
 one iPhone, including an app installed in Applications. Both its built-in
 keyboard and a connected external Bluetooth keyboard have been used successfully.
-The user also confirmed the complete abc123 string on iPhone with 0.4.0.
-That test did not strictly cover starting input from another Mac app with
-full settings closed; an activation and focus bug was later found there.
-Version 0.4.1 is undergoing local and offline checks and has not completed
-phone-side typing validation of the fix.
+Version 0.4.1 fixed activation and focus with full settings closed. The user
+confirmed that the global shortcut started input in that workflow and the
+complete abc123 string appeared on iPhone. Both pressing the shortcut again
+and switching to another Mac window stopped capture and returned the icon to
+its gray outline. In 0.5.0, the user also confirmed complete abc123 input with
+both full settings and the hint turned off, normal icon and stop behavior,
+and no hint window appearing.
 Other Macs, iPhones, OS versions, USB keyboards, non-ANSI layouts, sleep/wake
 reconnection and long-term reliability have not been comprehensively tested.
 
@@ -129,18 +137,24 @@ level. Its PnP manufacturer field is an experimental placeholder.
 
 TROUBLESHOOTING
 If pairing or input fails, check that the app is running, its Bluetooth service
-is started, and Bluetooth access is allowed. Press Esc to stop input, then
-right-click its menu bar icon and quit the app. Reopen it and select the Mac
-on the iPhone if needed. Confirm that a text field is focused on the iPhone
-before typing. Use the app's connection
-indicator and an actual text test to identify a working connection.
+is started, and Bluetooth access is allowed. Confirm that a text field is
+focused on the iPhone and its hardware-keyboard layout and input method match
+the intended test.
+If the app shows a connection but no text appears, open Full Settings… and
+click Stop Keyboard Service, then Start Keyboard Service. Wait for reconnection
+and try Send English Test, checking the result on the phone. Restarting only
+the app's service restored output in one 0.4.1 test; the root cause was not
+determined. Do not start by deleting pairing records or resetting global
+Bluetooth settings.
 
 No Dock icon or full window is expected by default. Find the app icon in
 the Mac's menu bar and right-click it to open full settings or quit.
+The input hint window is optional; check Show input hint window in full
+settings if you want to see it during capture.
 
 PRIVACY AND LOGS
-Input is relayed only while capture is active and either the app's input
-panel or the input area in full settings has focus. The global shortcut toggles capture. The app does not request
+Input is relayed only while capture is active and the app has keyboard focus;
+the hint window is optional. The global shortcut toggles capture. The app does not request
 Accessibility or Input Monitoring access. It does
 not read Apple account data, contacts or the clipboard, and sends no input
 through the internet or iCloud.

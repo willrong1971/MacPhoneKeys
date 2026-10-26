@@ -106,3 +106,5 @@
 "无法安装系统快捷键处理器（OSStatus %d）。" = "The system shortcut event handler could not be installed (OSStatus %d).";
 "无法注册全局快捷键（OSStatus %d）。" = "The global shortcut could not be registered (OSStatus %d).";
 "未能取得输入焦点，已取消；请重试快捷键。" = "Input focus was not acquired. Input was cancelled; please try the shortcut again.";
+"显示输入提示浮窗" = "Show input hint window";
+"关闭后，仅通过菜单栏图标显示输入状态。" = "When off, only the menu bar icon shows the input state.";
