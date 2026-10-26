@@ -113,10 +113,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var globalHotKey: GlobalHotKey?
     weak var captureSurface: KeyboardSurface?
     var endingCapture = false
+    var captureActivation = CaptureActivation()
+    var advancingCaptureActivation = false
+    var workspaceActivationObserver: NSObjectProtocol?
     var waitingForHotKeyRelease = false
     var previewHotKeyPresses = 0
     var central: CBCentralManager?
     var capturing = false
+    var captureSessionID = UUID()
     var isStarted = false
     var isConnected = false
     var refreshingDevices = false
@@ -158,6 +162,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         if isLocalizationPreview { transport = PreviewKeyboardTransport() }
         attachTransportCallbacks()
         menuBar = MenuBarController(controller: self)
+        workspaceActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let self, self.captureActivation.pending != nil,
+                  let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+                  app.processIdentifier != self.menuBar.previousApplicationPID else { return }
+            self.endCapture()
+        }
         let shortcut = GlobalHotKey { [weak self] in
             guard let self else { return }
             if self.isLocalizationPreview { self.previewHotKeyPresses += 1 }
@@ -482,10 +495,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         }
         startButton.title = isStarted ? L("停止蓝牙键盘") : L("启动蓝牙键盘")
         captureButton.isEnabled = isConnected && !isTesting
-        captureButton.title = capturing ? L("停止输入（Esc）") : L("开始输入")
-        testButton.isEnabled = isConnected && !capturing && !isTesting
-        languageButton.isEnabled = isConnected && !isTesting
-        connectButton.isEnabled = !capturing && !isTesting && !isLocalizationPreview
+        captureButton.title = capturing || captureActivation.pending != nil ? L("停止输入（Esc）") : L("开始输入")
+        testButton.isEnabled = isConnected && !capturing && !isTesting && captureActivation.pending == nil
+        languageButton.isEnabled = isConnected && !isTesting && captureActivation.pending == nil
+        connectButton.isEnabled = !capturing && !isTesting && captureActivation.pending == nil && !isLocalizationPreview
         countLabel.stringValue = LF("已接收按键：%ld", sentCount)
         surface.needsDisplay = true
         menuBar?.update()
@@ -497,21 +510,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     func toggleMenuBarCapture(fromHotKey: Bool = false) {
-        if capturing { endCapture(restoreFocus: true); return }
+        if capturing || captureActivation.pending != nil { endCapture(restoreFocus: true); return }
         guard isConnected, !isTesting else { showSettings(); return }
+        let request = captureActivation.begin(fromHotKey: fromHotKey)
         menuBar.showCapturePanel()
-        if !beginCapture(in: menuBar.surface, fromHotKey: fromHotKey) { menuBar.hideCapturePanel(restoreFocus: true) }
-        writeState()
+        advanceCaptureActivation()
+        // Activation and key-window notifications may arrive on later turns.
+        // The request survives those turns, but a stopped request never revives.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.captureActivation.isCurrent(request) else { return }
+            self.advanceCaptureActivation()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self, self.captureActivation.isCurrent(request) else { return }
+            self.endCapture()
+            self.appendLog(L("未能取得输入焦点，已取消；请重试快捷键。"))
+        }
+        updateUI()
+    }
+
+    func advanceCaptureActivation() {
+        guard !advancingCaptureActivation, let request = captureActivation.pending,
+              isConnected, !isTesting else { return }
+        advancingCaptureActivation = true
+        defer { advancingCaptureActivation = false }
+        if NSApp.isActive { menuBar.focusCapturePanel() }
+        guard let ready = captureActivation.completeIfReady(
+            request, appActive: NSApp.isActive, panelKey: menuBar.panel.isKeyWindow,
+            responderReady: menuBar.panel.firstResponder === menuBar.surface
+        ) else { return }
+        if !beginCapture(in: menuBar.surface, fromHotKey: ready.fromHotKey) {
+            endCapture()
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) { advanceCaptureActivation(); writeState() }
+    func applicationDidResignActive(_ notification: Notification) { writeState() }
+    func windowDidBecomeKey(_ notification: Notification) {
+        if notification.object as? NSWindow === menuBar?.panel { advanceCaptureActivation() }
     }
 
     @discardableResult func beginCapture(in target: KeyboardSurface, fromHotKey: Bool = false) -> Bool {
         guard isConnected, !capturing, !isTesting else { return false }
         guard let targetWindow = target.window, targetWindow.makeFirstResponder(target),
               targetWindow.isKeyWindow, targetWindow.firstResponder === target else { return false }
+        let initiatedByHotKey = fromHotKey || captureActivation.pending?.fromHotKey == true
+        captureActivation.cancel()
         pressed.removeAll(); modifiers = 0
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
         captureSurface = target
-        waitingForHotKeyRelease = fromHotKey && !NSEvent.modifierFlags.intersection([.control, .option]).isEmpty
+        captureSessionID = UUID()
+        waitingForHotKeyRelease = initiatedByHotKey && !NSEvent.modifierFlags.intersection([.control, .option]).isEmpty
         capturing = true
         appendLog(L("开始前台键盘输入；Esc 或窗口失焦时停止。"))
         updateUI()
@@ -522,17 +571,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         endingCapture = true
         defer { endingCapture = false }
         let wasCapturing = capturing
+        let wasPending = captureActivation.pending != nil
+        captureActivation.cancel()
         // Even an idle UI may still have a test or shortcut awaiting BLE capacity.
         if isConnected { transport.cancelPendingInput() }
         pressed.removeAll(); modifiers = 0; capturing = false
         captureSurface = nil
         waitingForHotKeyRelease = false
-        menuBar?.hideCapturePanel(restoreFocus: restoreFocus && wasCapturing)
+        menuBar?.hideCapturePanel(restoreFocus: restoreFocus && (wasCapturing || wasPending))
         if wasCapturing { appendLog(L("已停止键盘输入，并释放按键。")) }
         if window != nil { updateUI() }
     }
 
     func keyDown(_ event: NSEvent) {
+        if event.keyCode == 53, captureActivation.pending != nil { endCapture(restoreFocus: true); return }
         guard acceptsKeyboardEvents else { return }
         if event.keyCode == 53 { endCapture(restoreFocus: true); return }
         if event.keyCode == 40, event.modifierFlags.intersection([.control, .option, .command, .shift]) == [.control, .option] {
@@ -583,7 +635,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     @objc func sendTest() {
-        guard isConnected, !capturing, !isTesting else { return }
+        guard isConnected, !capturing, !isTesting, captureActivation.pending == nil else { return }
         let alert = NSAlert()
         alert.messageText = L("将英文测试串输入到 iPhone")
         alert.informativeText = L("请先在 iPhone 的备忘录中点一下空白正文。此按钮会输入一行英文和数字，不会按回车。")
@@ -622,7 +674,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     @objc func switchPhoneLanguage() {
-        guard isConnected, !isTesting else { return }
+        guard isConnected, !isTesting, captureActivation.pending == nil else { return }
         endCapture()
         if transport.sendReport(modifiers: 0x01, keys: [0x2C]) {
             _ = transport.sendReport(modifiers: 0, keys: [])
@@ -650,6 +702,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                   "acceptedKeyPresses": sentCount, "status": status,
                                   "phoneTextVerifiedByApp": false, "transportMode": transportMode,
                                   "shortcutRegistered": globalHotKey?.isRegistered ?? false,
+                                  "capturePending": captureActivation.pending != nil,
+                                  "settingsVisible": window?.isVisible ?? false,
+                                  "inputPanelVisible": menuBar?.panel.isVisible ?? false,
+                                  "inputPanelKey": menuBar?.panel.isKeyWindow ?? false,
+                                  "appActive": NSApp.isActive,
                                   "updatedAt": ISO8601DateFormatter().string(from: Date())]
         if let preview = transport as? PreviewKeyboardTransport {
             // Aggregate fixture diagnostics only; never save characters or key codes.
@@ -668,10 +725,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func windowDidResignKey(_ notification: Notification) {
         cancelTest()
         guard let lostWindow = notification.object as? NSWindow else { return }
+        let pendingAtResign = captureActivation.pending
+        let sessionAtResign = capturing ? captureSessionID : nil
         // A status-item click and a switch between our two windows may resign
         // key before their action runs. Check the final responder next turn.
         DispatchQueue.main.async { [weak self, weak lostWindow] in
-            guard let self, let lostWindow, self.captureSurface?.window === lostWindow, !lostWindow.isKeyWindow else { return }
+            guard let self, let lostWindow, !lostWindow.isKeyWindow else { return }
+            let wasCaptureWindow = sessionAtResign != nil && self.capturing && self.captureSessionID == sessionAtResign
+                && self.captureSurface?.window === lostWindow
+            let wasPendingPanel = pendingAtResign.map { self.captureActivation.isCurrent($0) } == true
+                && self.menuBar?.panel === lostWindow
+            guard wasCaptureWindow || wasPendingPanel else { return }
             self.endCapture()
         }
     }
@@ -679,10 +743,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         cancelTest(); endCapture()
         sender.orderOut(nil)
+        writeState()
         return false
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) {
+        if let observer = workspaceActivationObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         globalHotKey?.unregister()
         menuBar?.remove()
         cancelTest(); endCapture(); transport.stop(); isStarted = false; isConnected = false; status = L("已退出"); writeState()

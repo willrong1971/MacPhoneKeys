@@ -105,3 +105,4 @@
 "系统不接受此按键与修饰键组合。" = "The system did not accept this key code and modifier combination.";
 "无法安装系统快捷键处理器（OSStatus %d）。" = "The system shortcut event handler could not be installed (OSStatus %d).";
 "无法注册全局快捷键（OSStatus %d）。" = "The global shortcut could not be registered (OSStatus %d).";
+"未能取得输入焦点，已取消；请重试快捷键。" = "Input focus was not acquired. Input was cancelled; please try the shortcut again.";

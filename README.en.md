@@ -10,7 +10,7 @@ MacPhoneKeys stays in the **menu bar**, without a Dock icon. Left-click its icon
 
 Author: **九福爸爸 9fbaba**.
 
-Version **0.4.0 (6)** supports English, Simplified Chinese and Traditional Chinese. The app selects its interface language from the Mac's preferred supported languages, with English as the fallback. Its English name is **MacPhoneKeys**; its Chinese name is **手机键盘**.
+Version **0.4.1 (7)** supports English, Simplified Chinese and Traditional Chinese. The app selects its interface language from the Mac's preferred supported languages, with English as the fallback. Its English name is **MacPhoneKeys**; its Chinese name is **手机键盘**.
 
 ## Interface language
 
@@ -33,7 +33,9 @@ The build script produces a **Universal app containing `arm64` and `x86_64`**. A
 
 The recorded reference setup was one Apple silicon Mac running **macOS 26.6.2** and one iPhone. Verification confirmed an encrypted keyboard connection, the complete test string `mac keyboard test 123`, and physical typing of `abc123`. The installed app was also confirmed to type successfully. The user has additionally confirmed input from an external Bluetooth keyboard connected to the Mac.
 
-Those phone-side typing results came from **0.2.0**. Validation of the **0.4.0 (6)** menu bar interface is limited to local previews and offline regression checks. It has not undergone a new phone-side typing test, and the working **0.2.0** installation remains untouched. The earlier result does not verify the new menu bar workflow end to end.
+Those phone-side typing results came from **0.2.0**. The user subsequently entered the complete `abc123` string on iPhone with **0.4.0**, but that test did not strictly cover starting input from another Mac app with full settings closed. An activation and focus bug was later found in that scenario.
+
+**0.4.1 (7)** fixes asynchronous activation and focus handling when starting input. Local preview and offline checks are still in progress; this version has not completed phone-side validation. The earlier `abc123` result does not verify the fixed workflow with settings closed.
 
 Other Mac models, Intel hardware, other macOS versions, other iPhones, Chinese candidate selection, other languages and keyboard layouts, and reconnection after sleep still need testing. These results are not a general compatibility guarantee.
 
@@ -78,7 +80,7 @@ Distributors must arrange their own appropriate signing and notarization. See [A
 1. Open **MacPhoneKeys** on the Mac, find its app icon in the menu bar, and wait for the service to start.
 2. On the iPhone, open **Settings → Bluetooth** and select the **Mac's system name**. It may not appear as “MacPhoneKeys” or “MacKeys.” Follow the system pairing prompts and verify any displayed pairing code.
 3. Open Notes or another app on the iPhone and tap the text field where you want to type. Make sure its cursor is active.
-4. Once the connection is ready, left-click the Mac's menu bar icon or press **Control + Option + K**. Type when the small input panel appears, using the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac.
+4. Once the connection is ready, left-click the Mac's menu bar icon or press **Control + Option + K**. Wait for the small input panel to gain focus and the icon to become filled, then type using the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac.
 5. Press **Esc**, click the menu bar icon again, or switch to another Mac window to stop forwarding input and request key release.
 
 For an initial check, right-click the menu bar icon, choose **Full Settings…**, and click **Send English Test**. In the confirmation dialog, choose **Send Test Text** to send `mac keyboard test 123` without pressing Return, or **Cancel** to leave the phone unchanged. For this literal test string, use an English/US hardware keyboard layout on the iPhone.
@@ -87,7 +89,7 @@ Confirm that the text actually appears on the iPhone. **Accepted keys** includes
 
 ## Menu bar and shortcut
 
-- A **filled icon** means input is being forwarded to iPhone. A **gray outline** means local Mac input. The icon's fill does not prove that pairing succeeded or that the iPhone displayed any text.
+- A **filled icon** means capture has actually gained input focus and input is being forwarded to iPhone. A **gray outline** means local Mac input. Requesting activation alone does not fill the icon, and its fill does not prove that the iPhone displayed any text.
 - Left-click the icon to toggle iPhone input. Right-click it for **Start phone input** / **Stop phone input**, **Full Settings…**, help and quit.
 - The default global shortcut is **Control + Option + K**. If another app has already registered it, MacPhoneKeys reports the conflict; the icon and menu remain available.
 - The small input panel is shown only while capture is active. Leaving it stops capture so the Mac can receive normal typing again.
@@ -95,6 +97,8 @@ Confirm that the text actually appears on the iPhone. **Accepted keys** includes
 Full settings retains pairing, connection diagnostics, logs, English test text and input-method controls. Diagnostic transports remain experimental; the documented connection uses the default BLE transport.
 
 **Start Typing** in full settings also opens the small input panel. You can alternatively click the original input area in full settings to capture keystrokes there.
+
+Full settings can stay closed during normal use. In 0.4.1, a shortcut or icon action from another Mac app first waits for MacPhoneKeys to activate and its input panel to gain focus before enabling capture. Cancellation or focus loss invalidates a pending activation, so a late event cannot restart input. The global shortcut does not depend on keeping full settings open.
 
 ## Controls reference
 
@@ -143,19 +147,19 @@ To rebuild the app and make a disk image:
 zsh package.sh
 ```
 
-The default output is `build/手机键盘-0.4.0-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
+The default output is `build/手机键盘-0.4.1-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
 
 The disk image includes Chinese and English installation/usage instructions and the MIT license file, `LICENSE`.
 
 To package an existing app without rebuilding it:
 
 ```sh
-zsh package.sh build/手机键盘-0.4.0-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.4.1-通用版.dmg build/手机键盘.app
 ```
 
 Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eject the disk image after installation. If a release provides a prebuilt DMG, check that release's signing and notarization information before opening the app.
 
-The packaging script currently expects version **0.4.0 (6)**. Update the version check in the script and `Resources/Info.plist` together when changing that version.
+The packaging script currently expects version **0.4.1 (7)**. Update the version check in the script and `Resources/Info.plist` together when changing that version.
 
 ## Troubleshooting
 

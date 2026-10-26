@@ -13,6 +13,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     let surface = KeyboardSurface()
     private let menu = NSMenu()
     private var previousApplication: NSRunningApplication?
+    var previousApplicationPID: pid_t? { previousApplication?.processIdentifier }
     private var toggleItem: NSMenuItem!
     private var connectionItem: NSMenuItem!
     private var shortcutItem: NSMenuItem!
@@ -77,7 +78,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         statusItem.button?.alphaValue = active ? 1 : 0.5
         statusItem.button?.setAccessibilityValue(state)
         statusItem.button?.toolTip = LF("%@ · 点击切换 · ⌃⌥K · 右键打开完整设置", state)
-        toggleItem.title = active ? L("停止手机输入") : L("开始手机输入")
+        toggleItem.title = active || controller.captureActivation.pending != nil ? L("停止手机输入") : L("开始手机输入")
         toggleItem.isEnabled = controller.isConnected && !controller.isTesting
         connectionItem.title = controller.isLocalizationPreview ? L("界面预览，不向手机发送")
             : controller.isConnected ? L("iPhone 已连接") : L("iPhone 未连接，请打开完整设置")
@@ -120,16 +121,25 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             let x = min(max(anchor.midX - panel.frame.width / 2, visible.minX + 8), visible.maxX - panel.frame.width - 8)
             panel.setFrameOrigin(NSPoint(x: x, y: anchor.minY - panel.frame.height - 8))
         } else { panel.center() }
+        NSApp.unhideWithoutActivation()
+        panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Called after activation, not as a synchronous assertion that activate()
+    /// has completed. The full settings window is never needed for capture.
+    func focusCapturePanel() {
+        guard NSApp.isActive, panel.isVisible else { return }
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(surface)
     }
 
     func hideCapturePanel(restoreFocus: Bool) {
         let previous = previousApplication
+        let shouldRestore = restoreFocus && NSApp.isActive
         previousApplication = nil
         panel.orderOut(nil)
-        if restoreFocus, let previous, !previous.isTerminated {
+        if shouldRestore, let previous, !previous.isTerminated {
             previous.activate(options: [.activateIgnoringOtherApps])
         }
     }

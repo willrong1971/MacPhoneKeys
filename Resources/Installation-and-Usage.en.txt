@@ -1,12 +1,12 @@
-MacPhoneKeys 0.4.0 (6) — Installation and usage
+MacPhoneKeys 0.4.1 (7) — Installation and usage
 Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
 
 Use a Mac keyboard to type on an iPhone over Bluetooth. The devices may use
 different Apple IDs. No iPhone app is required.
 
 The app stays in the menu bar without a Dock icon. Left-click its app
-icon or press Control + Option + K to toggle iPhone input. A filled icon means
-iPhone input is active; a gray outline means local Mac input. The icon does
+icon or press Control + Option + K to toggle iPhone input. The icon becomes
+filled only after capture gains input focus; a gray outline means local Mac input. The icon does
 not prove that text appeared on the phone.
 
 The app's English name is MacPhoneKeys; its Chinese name is 手机键盘.
@@ -24,13 +24,13 @@ interface does not switch immediately. This setting does not change the
 iPhone's input method or hardware-keyboard layout.
 
 INSTALLATION
-1. Open 手机键盘-0.4.0-通用版.dmg and drag the app to Applications.
+1. Open 手机键盘-0.4.1-通用版.dmg and drag the app to Applications.
 2. Open the app from Applications and allow Bluetooth access when prompted.
 3. Eject the disk image after installation. Run only one copy of the app.
 
-Development of 0.4.0 (6) leaves the working 0.2.0 installation untouched.
-The new menu bar interface has only local preview and offline regression
-validation; it has not undergone a new phone-side typing test.
+Version 0.4.1 (7) fixes activation and focus when starting input with full
+settings closed. Local preview and offline checks are still in progress;
+this version has not completed phone-side typing validation.
 
 To build from source, follow README.en.md at:
 https://github.com/willrong1971/MacPhoneKeys/blob/main/README.en.md
@@ -44,7 +44,8 @@ PAIRING AND TYPING
    the insertion cursor is visible. Use an English/US hardware-keyboard layout
    for the first literal English test.
 4. Once connected, left-click the menu bar icon or press Control + Option + K.
-   Type when the small input panel appears.
+   Wait for the small input panel to gain focus and the icon to become filled
+   before typing.
 5. Press Esc, click the icon again, or switch to another Mac window to stop
    relaying input and request key release.
 
@@ -60,6 +61,10 @@ and input-method controls. The small input panel appears only during capture;
 leaving it stops capture automatically.
 Start Typing in full settings also opens the small panel. Alternatively, click
 the original input area in full settings to capture keystrokes there.
+Full settings can stay closed during normal use. In 0.4.1, a shortcut or icon
+action from another Mac app waits for the app to activate and the input panel
+to gain focus before capture begins. Cancellation or focus loss invalidates
+pending activation; a late event cannot restart input.
 If another program has claimed Control + Option + K, the app reports the
 shortcut conflict. Use the icon or its menu to start and stop input instead.
 
@@ -111,9 +116,11 @@ The Mac must support the required Bluetooth peripheral operation.
 Typing with version 0.2.0 has been confirmed on one Apple silicon Mac running macOS 26.6.2 and
 one iPhone, including an app installed in Applications. Both its built-in
 keyboard and a connected external Bluetooth keyboard have been used successfully.
-The 0.4.0 (6) menu bar interface has only local preview and offline regression
-validation. It has not replaced the working installation for a new phone-side
-typing test.
+The user also confirmed the complete abc123 string on iPhone with 0.4.0.
+That test did not strictly cover starting input from another Mac app with
+full settings closed; an activation and focus bug was later found there.
+Version 0.4.1 is undergoing local and offline checks and has not completed
+phone-side typing validation of the fix.
 Other Macs, iPhones, OS versions, USB keyboards, non-ANSI layouts, sleep/wake
 reconnection and long-term reliability have not been comprehensively tested.
 

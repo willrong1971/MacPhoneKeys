@@ -17,6 +17,11 @@ xcrun swiftc -swift-version 5 -parse-as-library \
 "$checks_dir/LocalizationTests" "$project_dir"
 if [[ "${1:-}" == "--localization-only" ]]; then exit 0; fi
 
+xcrun swiftc -swift-version 5 -parse-as-library \
+  "$project_dir/Sources/CaptureActivation.swift" "$project_dir/Tests/CaptureActivationTests.swift" \
+  -framework Foundation -o "$checks_dir/CaptureActivationTests"
+"$checks_dir/CaptureActivationTests"
+
 xcrun swiftc -swift-version 5 \
   "$project_dir/Sources/KeyMapping.swift" "$project_dir/Tests/KeyMappingTests.swift" \
   -o "$checks_dir/KeyMappingTests"
