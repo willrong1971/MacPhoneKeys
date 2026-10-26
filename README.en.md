@@ -6,9 +6,11 @@
 
 Use a keyboard connected to your Mac to type on an iPhone over Bluetooth. The devices may use **different Apple IDs**, and no iPhone app is required.
 
+MacPhoneKeys stays in the **menu bar**, without a Dock icon. Left-click its icon or press **Control + Option + K** to toggle iPhone input. A small input panel appears only during capture. **Esc**, another click on the icon, or switching to another window stops capture and requests key release.
+
 Author: **九福爸爸 9fbaba**.
 
-Version **0.3.0 (5)** supports English, Simplified Chinese and Traditional Chinese. The app selects its interface language from the Mac's preferred supported languages, with English as the fallback. Its English name is **MacPhoneKeys**; its Chinese name is **手机键盘**.
+Version **0.4.0 (6)** supports English, Simplified Chinese and Traditional Chinese. The app selects its interface language from the Mac's preferred supported languages, with English as the fallback. Its English name is **MacPhoneKeys**; its Chinese name is **手机键盘**.
 
 ## Interface language
 
@@ -18,7 +20,7 @@ You can change the Mac's preferred language order. Where macOS provides per-app 
 
 The app's interface language is separate from the iPhone's input method and hardware-keyboard layout. Changing the interface language does not change the phone's typing language. The [controls reference](#controls-reference) compares the English and Simplified Chinese interfaces.
 
-Input from the Mac's built-in keyboard and an external Bluetooth keyboard connected to the Mac has been confirmed by the user. USB keyboards have not been tested. Connect an external keyboard to the Mac first; MacPhoneKeys forwards the keyboard events received by its own input area.
+Input from the Mac's built-in keyboard and an external Bluetooth keyboard connected to the Mac was confirmed with the earlier app. USB keyboards have not been tested. Connect an external keyboard to the Mac first; MacPhoneKeys forwards keyboard events only during capture in its input panel or the full settings input area.
 
 ## Requirements and verification
 
@@ -31,7 +33,7 @@ The build script produces a **Universal app containing `arm64` and `x86_64`**. A
 
 The recorded reference setup was one Apple silicon Mac running **macOS 26.6.2** and one iPhone. Verification confirmed an encrypted keyboard connection, the complete test string `mac keyboard test 123`, and physical typing of `abc123`. The installed app was also confirmed to type successfully. The user has additionally confirmed input from an external Bluetooth keyboard connected to the Mac.
 
-Those phone-side typing results came from **0.2.0**. Version **0.3.0** has passed language selection, offline regression checks and isolated UI previews with Bluetooth disabled. It has not replaced the working installation for a new phone-side typing test. Bluetooth protocol data, connection handling and send-queue logic are unchanged.
+Those phone-side typing results came from **0.2.0**. Validation of the **0.4.0 (6)** menu bar interface is limited to local previews and offline regression checks. It has not undergone a new phone-side typing test, and the working **0.2.0** installation remains untouched. The earlier result does not verify the new menu bar workflow end to end.
 
 Other Mac models, Intel hardware, other macOS versions, other iPhones, Chinese candidate selection, other languages and keyboard layouts, and reconnection after sleep still need testing. These results are not a general compatibility guarantee.
 
@@ -59,7 +61,7 @@ The output path remains `build/手机键盘.app` in every interface language. Th
 3. Allow Bluetooth access when macOS asks.
 4. Keep only one copy of the app running while using or testing it.
 
-The app starts its Bluetooth keyboard service automatically. Continue with [Pair and type](#pair-and-type).
+The app starts its Bluetooth keyboard service automatically and appears in the menu bar. It does not open the full settings window or add a Dock icon by default. Continue with [Pair and type](#pair-and-type).
 
 ### Bluetooth permission, signing and notarization
 
@@ -73,15 +75,26 @@ Distributors must arrange their own appropriate signing and notarization. See [A
 
 ## Pair and type
 
-1. Open **MacPhoneKeys** on the Mac and wait for the service to start.
+1. Open **MacPhoneKeys** on the Mac, find its app icon in the menu bar, and wait for the service to start.
 2. On the iPhone, open **Settings → Bluetooth** and select the **Mac's system name**. It may not appear as “MacPhoneKeys” or “MacKeys.” Follow the system pairing prompts and verify any displayed pairing code.
 3. Open Notes or another app on the iPhone and tap the text field where you want to type. Make sure its cursor is active.
-4. On the Mac, wait until **Start Typing** becomes available, then click it. Keep the app's input area focused and type with the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac.
-5. Press **Esc**, click **Stop Typing (Esc)**, or switch to another Mac window to stop forwarding input.
+4. Once the connection is ready, left-click the Mac's menu bar icon or press **Control + Option + K**. Type when the small input panel appears, using the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac.
+5. Press **Esc**, click the menu bar icon again, or switch to another Mac window to stop forwarding input and request key release.
 
-For an initial check, click **Send English Test**. In the confirmation dialog, choose **Send Test Text** to send `mac keyboard test 123` without pressing Return, or **Cancel** to leave the phone unchanged. For this literal test string, use an English/US hardware keyboard layout on the iPhone.
+For an initial check, right-click the menu bar icon, choose **Full Settings…**, and click **Send English Test**. In the confirmation dialog, choose **Send Test Text** to send `mac keyboard test 123` without pressing Return, or **Cancel** to leave the phone unchanged. For this literal test string, use an English/US hardware keyboard layout on the iPhone.
 
 Confirm that the text actually appears on the iPhone. **Accepted keys** includes reports waiting in a local send queue; a rising count is not proof of phone-side delivery or visible text.
+
+## Menu bar and shortcut
+
+- A **filled icon** means input is being forwarded to iPhone. A **gray outline** means local Mac input. The icon's fill does not prove that pairing succeeded or that the iPhone displayed any text.
+- Left-click the icon to toggle iPhone input. Right-click it for **Start phone input** / **Stop phone input**, **Full Settings…**, help and quit.
+- The default global shortcut is **Control + Option + K**. If another app has already registered it, MacPhoneKeys reports the conflict; the icon and menu remain available.
+- The small input panel is shown only while capture is active. Leaving it stops capture so the Mac can receive normal typing again.
+
+Full settings retains pairing, connection diagnostics, logs, English test text and input-method controls. Diagnostic transports remain experimental; the documented connection uses the default BLE transport.
+
+**Start Typing** in full settings also opens the small input panel. You can alternatively click the original input area in full settings to capture keystrokes there.
 
 ## Controls reference
 
@@ -90,15 +103,18 @@ These labels are a reference for the English and Simplified Chinese interfaces. 
 | Simplified Chinese interface | English interface | Purpose |
 | --- | --- | --- |
 | 手机键盘 | MacPhoneKeys | App and window name. |
+| 开始手机输入 | Start phone input | Start capture from the menu bar menu. |
+| 停止手机输入 | Stop phone input | Stop capture from the menu bar menu. |
+| 完整设置… | Full Settings… | Open pairing, diagnostics, test and other settings controls. |
 | 启动蓝牙键盘 | Start Keyboard Service | Start the service if it is stopped. |
 | 停止蓝牙键盘 | Stop Keyboard Service | Stop the service. |
 | 打开 Mac 蓝牙设置 | Mac Bluetooth Settings | Open the Mac's Bluetooth settings. |
-| 开始输入 | Start Typing | Focus the input area and forward keyboard events. |
+| 开始输入 | Start Typing | Open the small input panel and begin capture. |
 | 停止输入（Esc） | Stop Typing (Esc) | Stop forwarding input and release keys. |
 | 发送英文测试串 | Send English Test | Open the test confirmation dialog. |
 | 发送测试串 | Send Test Text | Confirm sending the English test string. |
 | 取消 | Cancel | Cancel the test dialog. |
-| 切换手机输入法 | Switch iPhone Input Method | Send Control + Space to the phone. Click Start Typing again afterward. |
+| 切换手机输入法 | Switch iPhone Input Method | Send Control + Space to the phone. Use the icon or global shortcut to start typing again afterward. |
 | 已接收按键 | Accepted keys | Local input count, including reports waiting to send. |
 | 连接记录 | Connection Log | Service, connection and error messages. |
 | 打开记录文件 | Show Log File | Locate the log in Finder. |
@@ -106,7 +122,7 @@ These labels are a reference for the English and Simplified Chinese interfaces. 
 | 知道了 | Got It | Close the help dialog. |
 | 退出手机键盘 | Quit MacPhoneKeys | Quit the app. |
 
-Additional pairing and transport controls may appear when the app is launched with `--diagnostics`. They belong to experimental diagnostics and are not required for the default BLE workflow.
+The right-click menu opens full settings, where pairing, test and transport-diagnostic controls are available. These diagnostics are not required for the default BLE workflow.
 
 ## Input methods and keyboard layouts
 
@@ -115,7 +131,7 @@ MacPhoneKeys forwards **hardware key events**, not completed text from the Mac's
 - Physical key codes follow an **ANSI-based mapping**. The English test string uses US-ANSI keystrokes.
 - Common letters, digits, punctuation, navigation keys and modifiers are mapped in the source. This is not a promise that all keyboard shortcuts or extra hardware keys work on every layout.
 - ISO/JIS-specific keys, other layouts and other languages have not been comprehensively mapped or verified. Punctuation can differ when the iPhone uses a different hardware keyboard layout.
-- For Chinese, select an appropriate hardware keyboard input method on the iPhone. The **Switch iPhone Input Method** button sends **Control + Space**; click **Start Typing** again afterward. Chinese candidate selection has not completed physical-device validation.
+- For Chinese, select an appropriate hardware keyboard input method on the iPhone. In full settings, **Switch iPhone Input Method** sends **Control + Space**; use the menu bar icon or global shortcut to start typing again afterward. Chinese candidate selection has not completed physical-device validation.
 - Text already composed on the Mac, including Chinese characters, is not inserted as a Unicode string. The app does not read or transfer the Mac's clipboard and does not implement Unicode text injection.
 - **Esc is reserved for stopping input** in the Mac app; it is not forwarded as an Escape keystroke to the phone.
 
@@ -127,19 +143,19 @@ To rebuild the app and make a disk image:
 zsh package.sh
 ```
 
-The default output is `build/手机键盘-0.3.0-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
+The default output is `build/手机键盘-0.4.0-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
 
 The disk image includes Chinese and English installation/usage instructions and the MIT license file, `LICENSE`.
 
 To package an existing app without rebuilding it:
 
 ```sh
-zsh package.sh build/手机键盘-0.3.0-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.4.0-通用版.dmg build/手机键盘.app
 ```
 
 Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eject the disk image after installation. If a release provides a prebuilt DMG, check that release's signing and notarization information before opening the app.
 
-The packaging script currently expects version **0.3.0 (5)**. Update the version check in the script and `Resources/Info.plist` together when changing that version.
+The packaging script currently expects version **0.4.0 (6)**. Update the version check in the script and `Resources/Info.plist` together when changing that version.
 
 ## Troubleshooting
 
@@ -161,7 +177,15 @@ The iPhone interprets ANSI-based physical key codes using its own active layout.
 
 ### Pairing or reconnection fails after a rebuild or installation
 
-Run one installed copy from Applications and inspect the connection log. To reopen it, press **Esc** to stop input, then quit with **Command-Q** before opening it again. System-managed pairing and GATT service caching can affect reconnection, and the current implementation has limited cross-device testing. Do not repeatedly delete pairing records or reset global Bluetooth settings as a first step. Report the exact failure and relevant errors so that discovery, authentication and subscription problems can be distinguished.
+Run one copy and inspect the connection log in full settings. To reopen it, press **Esc** to stop input, then right-click the menu bar icon and choose **Quit MacPhoneKeys** before opening it again. System-managed pairing and GATT service caching can affect reconnection, and the current implementation has limited cross-device testing. Do not repeatedly delete pairing records or reset global Bluetooth settings as a first step. Report the exact failure and relevant errors so that discovery, authentication and subscription problems can be distinguished.
+
+### No Dock icon or full window appears
+
+This is the default menu bar mode. Look for the app icon near the Mac's menu bar clock. Right-click it to open full settings or quit. The small input panel appears only during input capture.
+
+### The global shortcut is unavailable
+
+MacPhoneKeys reports a shortcut-registration conflict if another program has claimed **Control + Option + K**. Use the menu bar icon or its menu to start and stop input; the app does not silently take over the conflicting shortcut.
 
 ### The phone reports a full keyboard battery
 
@@ -197,13 +221,15 @@ After building, developers can prepare isolated UI previews:
 python3 scripts/make-localization-previews.py build/手机键盘.app
 ```
 
-The copies under `build/localization-previews/` use separate app identities and temporary log directories. Bluetooth services are disabled. Use them to inspect translations and layout, not for typing or distribution.
+The copies under `build/localization-previews/` use separate app identities, temporary log directories and an isolated `PreviewKeyboardTransport`. They do not start Bluetooth managers or send input to a phone. You can test translations, layout, focus, global shortcuts, icon states and local accepted-key counts. These previews validate the interface and local key routing; they cannot verify that text appears on an iPhone and must not be distributed as installable releases.
 
 After changing Simplified Chinese translations, run `xcrun swift scripts/generate-traditional-localization.swift` to update Traditional Chinese values, then review the result. Lookup keys remain unchanged.
 
 | Path | Contents |
 | --- | --- |
-| `Sources/main.swift` | Localized UI and foreground keyboard events. |
+| `Sources/main.swift` | Localized menu bar, full settings, input panel and foreground keyboard events. |
+| `Sources/MenuBarController.swift` | Menu bar icon, left/right clicks and menu. |
+| `Sources/GlobalHotKey.swift` | Global input-toggle shortcut and conflict handling. |
 | `Sources/KeyMapping.swift` | Mac key codes to HID usages. |
 | `Sources/BLEKeyboard.swift` | BLE HID services and bounded input queue. |
 | `Sources/BluetoothKeyboard.swift` | Experimental Classic Bluetooth transport. |
@@ -221,7 +247,7 @@ xcrun swift scripts/generate-icon.swift
 
 ## Privacy and issue reports
 
-The app receives keyboard events only while its own foreground input area is active. It does not request Accessibility or Input Monitoring permission, read Apple accounts, the clipboard or contacts, or send input through iCloud or the network. Connection logs record connection events, errors and counts, not typed content.
+The app receives keystrokes for forwarding only after capture is enabled and while its input panel or the input area in full settings has focus. The global shortcut toggles capture. The app does not request Accessibility or Input Monitoring permission, read Apple accounts, the clipboard or contacts, or send input through iCloud or the network. Connection logs record connection events, errors and counts, not typed content.
 
 For a useful issue report, include the macOS and iOS versions, Mac architecture, keyboard connection type and layout, reproduction steps, and relevant connection errors. Say whether text was actually visible on the iPhone. Remove device names, Bluetooth addresses, account details and other personal information before sharing logs.
 

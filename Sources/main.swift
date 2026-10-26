@@ -24,25 +24,41 @@ extension KeyboardTransport {
 // The diagnostic log records connection events and counts, never typed text or key codes.
 final class KeyboardSurface: NSView {
     weak var controller: AppDelegate?
+    var isCompact = false
     override var acceptsFirstResponder: Bool { true }
     override func resignFirstResponder() -> Bool {
-        controller?.endCapture()
+        if controller?.captureSurface === self { controller?.endCapture() }
         return true
     }
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
-        controller?.beginCapture()
+        controller?.beginCapture(in: self)
     }
     override func keyDown(with event: NSEvent) { controller?.keyDown(event) }
     override func keyUp(with event: NSEvent) { controller?.keyUp(event) }
     override func flagsChanged(with event: NSEvent) { controller?.flagsChanged(event) }
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard controller?.capturing == true, window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
+        if event.keyCode == 40, event.modifierFlags.intersection([.control, .option, .command, .shift]) == [.control, .option] {
+            if controller?.globalHotKey?.isRegistered != true { controller?.endCapture(restoreFocus: true) }
+            return true
+        }
         controller?.keyDown(event)
         return true
     }
     override func draw(_ dirtyRect: NSRect) {
         let active = controller?.capturing == true
+        if isCompact {
+            NSColor.windowBackgroundColor.setFill()
+            NSBezierPath(roundedRect: bounds, xRadius: 14, yRadius: 14).fill()
+            let style = NSMutableParagraphStyle(); style.alignment = .center
+            let title = controller?.isLocalizationPreview == true ? L("界面预览，不向手机发送") : L("正在向 iPhone 输入")
+            (title as NSString).draw(in: NSRect(x: 14, y: 55, width: bounds.width - 28, height: 26),
+                                    withAttributes: [.font: NSFont.systemFont(ofSize: 17, weight: .semibold), .foregroundColor: NSColor.labelColor, .paragraphStyle: style])
+            (L("Esc 或 ⌃⌥K 停止 · 切到其他窗口自动停止") as NSString).draw(in: NSRect(x: 10, y: 24, width: bounds.width - 20, height: 20),
+                                    withAttributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style])
+            return
+        }
         (active ? NSColor.controlAccentColor.withAlphaComponent(0.12) : NSColor.controlBackgroundColor).setFill()
         NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 12, yRadius: 12).fill()
         (active ? NSColor.controlAccentColor : NSColor.separatorColor).setStroke()
@@ -59,6 +75,32 @@ final class KeyboardSurface: NSView {
     }
 }
 
+/// Isolated UI previews exercise event routing without accessing any radio.
+private final class PreviewKeyboardTransport: KeyboardTransport {
+    var onLog: ((String) -> Void)?
+    var onStateChange: ((Bool, String) -> Void)?
+    var hostName: String { "Preview" }
+    var isConnected: Bool { true }
+    private(set) var reportCount = 0
+    private(set) var releaseCount = 0
+    private(set) var heldKeyCount = 0
+    private(set) var hasModifiers = false
+    func start() {}
+    func stop() {}
+    func connect(address: String) {}
+    func cancelPendingInput() {
+        releaseCount += 1
+        heldKeyCount = 0
+        hasModifiers = false
+    }
+    func sendReport(modifiers: UInt8, keys: [UInt8]) -> Bool {
+        reportCount += 1
+        heldKeyCount = keys.filter { $0 != 0 }.count
+        hasModifiers = modifiers != 0
+        return true
+    }
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCentralManagerDelegate {
     // UI validation uses an isolated bundle with this flag. It never starts a
     // Bluetooth manager or writes to the installed app's runtime directory.
@@ -67,6 +109,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var transportMode = 2
     var transportGeneration = UUID()
     var window: NSWindow!
+    var menuBar: MenuBarController!
+    var globalHotKey: GlobalHotKey?
+    weak var captureSurface: KeyboardSurface?
+    var endingCapture = false
+    var waitingForHotKeyRelease = false
+    var previewHotKeyPresses = 0
     var central: CBCentralManager?
     var capturing = false
     var isStarted = false
@@ -107,14 +155,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func applicationDidFinishLaunching(_ notification: Notification) {
         try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         buildUI()
+        if isLocalizationPreview { transport = PreviewKeyboardTransport() }
         attachTransportCallbacks()
+        menuBar = MenuBarController(controller: self)
+        let shortcut = GlobalHotKey { [weak self] in
+            guard let self else { return }
+            if self.isLocalizationPreview { self.previewHotKeyPresses += 1 }
+            self.toggleMenuBarCapture(fromHotKey: true)
+        }
+        globalHotKey = shortcut
+        do {
+            try shortcut.register()
+            menuBar.shortcutAvailable = true
+        } catch {
+            appendLog(LF("无法注册 ⌃⌥K 快捷键（%@）；仍可点击菜单栏图标。", error.localizedDescription))
+        }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? L("开发版")
         appendLog(LF("手机键盘 %@ 启动；仅记录连接事件和计数，不记录输入内容。", version))
         appendLog(LF("系统：%@", ProcessInfo.processInfo.operatingSystemVersionString))
-        if isLocalizationPreview { status = L("界面预览：未启动蓝牙服务") }
+        if isLocalizationPreview {
+            status = L("界面预览：未启动蓝牙服务")
+            isConnected = true
+        }
         updateUI()
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        if isLocalizationPreview || CommandLine.arguments.contains("--show-settings") { showSettings() }
         if !isLocalizationPreview {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.startService() }
         }
@@ -162,6 +226,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 750, height: contentHeight),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = L("手机键盘")
+        window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 700, height: 620)
         window.center()
         window.delegate = self
@@ -178,6 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
 
         stack.addArrangedSubview(label(L("用 Mac 键盘给 iPhone 打字"), size: 25, weight: .semibold))
         stack.addArrangedSubview(label(L("通过蓝牙连接。无需更换 Apple ID，无需在 iPhone 安装 App。"), color: .secondaryLabelColor))
+        stack.addArrangedSubview(label(L("日常点击菜单栏图标或按 ⌃⌥K；关闭此窗口后，App 继续在菜单栏运行。"), color: .secondaryLabelColor))
         stateLabel = label(L("尚未启动"), size: 17, weight: .medium)
         stack.addArrangedSubview(stateLabel)
         detailLabel = label(L("先启动服务，再打开两台设备的蓝牙设置完成配对。"), color: .secondaryLabelColor)
@@ -234,6 +300,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         let appMenu = NSMenuItem(); menu.addItem(appMenu)
         let submenu = NSMenu(title: L("手机键盘")); appMenu.submenu = submenu
         submenu.addItem(withTitle: L("关于手机键盘"), action: #selector(showAbout), keyEquivalent: "")
+        submenu.addItem(withTitle: L("完整设置…"), action: #selector(showSettings), keyEquivalent: ",")
         submenu.addItem(.separator())
         submenu.addItem(withTitle: L("隐藏手机键盘"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         let hideOthers = submenu.addItem(withTitle: L("隐藏其他"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
@@ -255,6 +322,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
 
     @objc func showAbout() {
         endCapture(); cancelTest()
+        NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
             .applicationName: L("手机键盘"),
             .credits: NSAttributedString(string: L("用 Mac 的键盘，通过蓝牙给 iPhone 输入。\n无需更换 Apple ID。"))
@@ -263,11 +331,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
 
     @objc func showHelp() {
         cancelTest(); endCapture()
+        NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = L("用 Mac 键盘给 iPhone 打字")
         alert.informativeText = L("1. 允许手机键盘使用蓝牙。\n2. iPhone 打开“设置 → 蓝牙”，选择这台 Mac 的名称并完成配对。\n3. 在 iPhone 的备忘录等 App 中点一下文字输入位置。\n4. 回到 Mac，点“开始输入”后打字；按 Esc 停止。\n\n中文使用 iPhone 的输入法，可点“切换手机输入法”发送切换快捷键。两个 Apple ID 无需更改。")
+            + "\n\n" + L("日常使用：点击菜单栏图标或按 ⌃⌥K，切换手机输入。实心图标表示正在手机输入，灰色轮廓表示本机输入。按 Esc 或切到其他窗口也会停止。右键图标可打开完整设置。")
         alert.addButton(withTitle: L("知道了"))
         alert.runModal()
+    }
+
+    @objc func showSettings() {
+        cancelTest(); endCapture()
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return false
     }
 
     @objc func toggleService() {
@@ -381,7 +462,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     func updateUI() {
-        stateLabel.stringValue = isConnected ? L("蓝牙键盘已连接") : status.replacingOccurrences(of: L("BLE 实验："), with: "")
+        stateLabel.stringValue = isLocalizationPreview ? status : isConnected ? L("蓝牙键盘已连接") : status.replacingOccurrences(of: L("BLE 实验："), with: "")
         stateLabel.textColor = isConnected ? .systemGreen : .labelColor
         detailLabel.stringValue = transportMode == 0
             ? LF("在 iPhone 蓝牙列表中查找：%@", transport.hostName)
@@ -407,31 +488,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         connectButton.isEnabled = !capturing && !isTesting && !isLocalizationPreview
         countLabel.stringValue = LF("已接收按键：%ld", sentCount)
         surface.needsDisplay = true
+        menuBar?.update()
         writeState()
     }
 
-    @objc func toggleCapture() { capturing ? endCapture() : beginCapture() }
-    func beginCapture() {
-        guard isConnected, !capturing, !isTesting else { return }
+    @objc func toggleCapture() {
+        toggleMenuBarCapture()
+    }
+
+    func toggleMenuBarCapture(fromHotKey: Bool = false) {
+        if capturing { endCapture(restoreFocus: true); return }
+        guard isConnected, !isTesting else { showSettings(); return }
+        menuBar.showCapturePanel()
+        if !beginCapture(in: menuBar.surface, fromHotKey: fromHotKey) { menuBar.hideCapturePanel(restoreFocus: true) }
+        writeState()
+    }
+
+    @discardableResult func beginCapture(in target: KeyboardSurface, fromHotKey: Bool = false) -> Bool {
+        guard isConnected, !capturing, !isTesting else { return false }
+        guard let targetWindow = target.window, targetWindow.makeFirstResponder(target),
+              targetWindow.isKeyWindow, targetWindow.firstResponder === target else { return false }
         pressed.removeAll(); modifiers = 0
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
+        captureSurface = target
+        waitingForHotKeyRelease = fromHotKey && !NSEvent.modifierFlags.intersection([.control, .option]).isEmpty
         capturing = true
-        window.makeFirstResponder(surface)
         appendLog(L("开始前台键盘输入；Esc 或窗口失焦时停止。"))
         updateUI()
+        return true
     }
-    func endCapture() {
+    func endCapture(restoreFocus: Bool = false) {
+        guard !endingCapture else { return }
+        endingCapture = true
+        defer { endingCapture = false }
         let wasCapturing = capturing
         // Even an idle UI may still have a test or shortcut awaiting BLE capacity.
         if isConnected { transport.cancelPendingInput() }
         pressed.removeAll(); modifiers = 0; capturing = false
+        captureSurface = nil
+        waitingForHotKeyRelease = false
+        menuBar?.hideCapturePanel(restoreFocus: restoreFocus && wasCapturing)
         if wasCapturing { appendLog(L("已停止键盘输入，并释放按键。")) }
         if window != nil { updateUI() }
     }
 
     func keyDown(_ event: NSEvent) {
-        guard capturing, isConnected, window.firstResponder === surface else { return }
-        if event.keyCode == 53 { endCapture(); return }
+        guard acceptsKeyboardEvents else { return }
+        if event.keyCode == 53 { endCapture(restoreFocus: true); return }
+        if event.keyCode == 40, event.modifierFlags.intersection([.control, .option, .command, .shift]) == [.control, .option] {
+            if globalHotKey?.isRegistered != true { endCapture(restoreFocus: true) }
+            return
+        }
+        guard !waitingForHotKeyRelease else { return }
         guard let usage = KeyMapping.usage(forMacKeyCode: event.keyCode) else { return }
         // Holding a key is represented as a held HID key; the iPhone controls repeat.
         if event.isARepeat || pressed.contains(usage) { return }
@@ -443,14 +551,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         updateUI()
     }
     func keyUp(_ event: NSEvent) {
-        guard capturing, isConnected, window.firstResponder === surface else { return }
+        guard acceptsKeyboardEvents, !waitingForHotKeyRelease else { return }
         guard let usage = KeyMapping.usage(forMacKeyCode: event.keyCode) else { return }
         pressed.remove(usage)
         modifiers = KeyMapping.modifierByte(rawFlags: event.modifierFlags.rawValue)
         if !transport.sendReport(modifiers: modifiers, keys: pressed.sorted()) { endCapture() }
     }
     func flagsChanged(_ event: NSEvent) {
-        guard capturing, isConnected, window.firstResponder === surface else { return }
+        guard acceptsKeyboardEvents else { return }
+        if waitingForHotKeyRelease {
+            if event.modifierFlags.intersection([.control, .option]).isEmpty { waitingForHotKeyRelease = false }
+            return
+        }
         modifiers = KeyMapping.modifierByte(rawFlags: event.modifierFlags.rawValue)
         // Caps Lock is a HID key, not a modifier bit. One press toggles the phone's state.
         if event.keyCode == 57 {
@@ -463,6 +575,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                 endCapture(); return
             }
         } else if !transport.sendReport(modifiers: modifiers, keys: pressed.sorted()) { endCapture() }
+    }
+
+    var acceptsKeyboardEvents: Bool {
+        guard capturing, isConnected, NSApp.isActive, let target = captureSurface, let targetWindow = target.window else { return false }
+        return targetWindow.isKeyWindow && targetWindow.firstResponder === target
     }
 
     @objc func sendTest() {
@@ -529,27 +646,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     func writeState() {
-        let state: [String: Any] = ["started": isStarted, "connected": isConnected, "capturing": capturing,
+        var state: [String: Any] = ["started": isStarted, "connected": isConnected, "capturing": capturing,
                                   "acceptedKeyPresses": sentCount, "status": status,
                                   "phoneTextVerifiedByApp": false, "transportMode": transportMode,
+                                  "shortcutRegistered": globalHotKey?.isRegistered ?? false,
                                   "updatedAt": ISO8601DateFormatter().string(from: Date())]
+        if let preview = transport as? PreviewKeyboardTransport {
+            // Aggregate fixture diagnostics only; never save characters or key codes.
+            state["preview"] = ["reports": preview.reportCount, "releases": preview.releaseCount,
+                                "heldKeyCount": preview.heldKeyCount, "hasModifiers": preview.hasModifiers,
+                                "hotKeyPresses": previewHotKeyPresses, "appActive": NSApp.isActive,
+                                "panelVisible": menuBar?.panel.isVisible ?? false,
+                                "panelIsKey": menuBar?.panel.isKeyWindow ?? false]
+        }
         if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: stateURL, options: .atomic)
         }
     }
 
     @objc func openLog() { NSWorkspace.shared.selectFile(logURL.path, inFileViewerRootedAtPath: rootURL.path) }
-    func windowDidResignKey(_ notification: Notification) { cancelTest(); endCapture() }
+    func windowDidResignKey(_ notification: Notification) {
+        cancelTest()
+        guard let lostWindow = notification.object as? NSWindow else { return }
+        // A status-item click and a switch between our two windows may resign
+        // key before their action runs. Check the final responder next turn.
+        DispatchQueue.main.async { [weak self, weak lostWindow] in
+            guard let self, let lostWindow, self.captureSurface?.window === lostWindow, !lostWindow.isKeyWindow else { return }
+            self.endCapture()
+        }
+    }
     func applicationWillResignActive(_ notification: Notification) { cancelTest(); endCapture() }
-    func windowWillClose(_ notification: Notification) { NSApp.terminate(nil) }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        cancelTest(); endCapture()
+        sender.orderOut(nil)
+        return false
+    }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) {
+        globalHotKey?.unregister()
+        menuBar?.remove()
         cancelTest(); endCapture(); transport.stop(); isStarted = false; isConnected = false; status = L("已退出"); writeState()
     }
 }
 
 let app = NSApplication.shared
-app.setActivationPolicy(.regular)
+app.setActivationPolicy(.accessory)
 let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

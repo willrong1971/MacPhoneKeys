@@ -2,8 +2,10 @@
 """Prepare isolated, Bluetooth-disabled copies for visual localization checks.
 
 Usage: python3 scripts/make-localization-previews.py build/手机键盘.app
-The copies are ad-hoc signed under build/localization-previews. Launch a copy
-through Finder to inspect it; this script never launches or installs an app.
+The copies are ad-hoc signed under build/localization-previews. Launch one copy
+at a time to inspect menu-bar focus, hotkeys and local input counters using a
+fake transport. No Bluetooth manager starts; no reports reach a phone.
+This script never launches or installs an app.
 """
 from pathlib import Path
 import plistlib

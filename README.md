@@ -6,13 +6,13 @@
 
 用 Mac 上的键盘，通过蓝牙给 iPhone 打字。两台设备可以登录不同的 Apple ID；iPhone 无需安装 App。
 
-已确认 Mac 自带键盘，以及连接到 Mac 的外接蓝牙键盘，都可以作为输入来源。USB 键盘尚未实测。
+旧版实测已确认 Mac 自带键盘，以及连接到 Mac 的外接蓝牙键盘，都可以作为输入来源。USB 键盘尚未实测。
 
 作者：**九福爸爸 9fbaba**。
 
-这是一个原生 macOS App，使用 Swift、AppKit 和 CoreBluetooth。输入仅在 App 前台的输入区中接收，按 **Esc** 或切换到其他窗口即可停止。
+这是一个原生 macOS App，使用 Swift、AppKit 和 CoreBluetooth。默认常驻菜单栏，不占 Dock。左键点击菜单栏图标，或按全局快捷键 **Control + Option + K**，即可切换手机输入，并在开始捕获时显示简短的输入提示面板。按 **Esc**、再次点击图标或切换到其他窗口，都会停止输入并尝试释放按键。
 
-当前版本为 **0.3.0 (5)**。App 支持简体中文、繁体中文和英文，会根据 Mac 的首选语言自动选择界面；[完整英文指南](README.en.md)提供英文安装与连接说明。
+当前版本为 **0.4.0 (6)**。App 支持简体中文、繁体中文和英文，会根据 Mac 的首选语言自动选择界面；[完整英文指南](README.en.md)提供英文安装与连接说明。
 
 ## 界面语言
 
@@ -31,7 +31,7 @@ App 使用标准 macOS Bundle 语言资源：`en`、`zh-Hans` 和 `zh-Hant`。ma
 - 用户使用 Mac 实体键盘手动输入 `abc123`，手机完整显示。
 - 安装到“应用程序”后的版本也已确认可以打字。
 
-上述手机输入记录来自 **0.2.0**。本次 **0.3.0** 已通过语言匹配、离线回归和禁用蓝牙的独立界面预览；尚未替换原安装版进行手机输入回归。蓝牙协议数据、连接与发送队列逻辑保持不变。
+上述手机输入记录来自 **0.2.0**。本次 **0.4.0 (6)** 的菜单栏界面只在本地预览和离线回归范围内验证，尚未进行新版手机端输入实测；现有 **0.2.0** 安装版保持不动。旧版手机实测结果不能代替新版菜单栏流程的端到端验证。
 
 构建目标为 **macOS 12.0 及以上**，生成包含 **arm64 和 x86_64** 的 Universal App。这个目标表示二进制的架构与最低系统版本，**不代表所有 Mac 和 iPhone 均已验证兼容**。Intel Mac、其他 macOS 版本、其他 iPhone、中文选字及睡眠后重连仍需实测。
 
@@ -68,17 +68,28 @@ zsh build.sh
 
 ## 连接 iPhone
 
-1. 打开 Mac 上的“手机键盘”，等待蓝牙键盘服务启动。
+1. 打开 Mac 上的“手机键盘”，找到“手机键盘”的菜单栏图标，等待蓝牙键盘服务启动。默认不会显示 Dock 图标或完整设置窗口。
 2. 在 iPhone 打开“设置 → 蓝牙”，选择这台 **Mac 的系统名称**，按系统提示完成配对。列表中的名称可能不是 App 名称。
 3. 在 iPhone 的备忘录等 App 中点一下文字输入位置，确认光标闪烁。
-4. 等待 Mac 的“开始输入”按钮可用，点击后用 Mac 键盘打字。
-5. 按 **Esc**，或切到其他 Mac 窗口，停止输入。
+4. 连接就绪后，左键点击 Mac 菜单栏图标，或按 **Control + Option + K**。输入提示面板出现后，用 Mac 键盘打字。
+5. 按 **Esc**、再次点击菜单栏图标，或切到其他 Mac 窗口，停止输入并尝试释放按键。
 
-可以先使用“发送英文测试串”按钮检查手机是否实际显示文字。“已接收按键”包含本地等待发送的报告；计数增长不能代替手机画面的确认。
+### 菜单栏与快捷键
+
+- **实心图标**表示正在向 iPhone 输入；**灰色轮廓图标**表示本机输入。图标的填充状态不是蓝牙配对成功或手机已显示文字的证明。
+- 左键点击图标切换手机输入；右键打开菜单，可选“开始手机输入”／“停止手机输入”、“完整设置…”、帮助或退出 App。
+- 默认全局快捷键为 **Control + Option + K**。如快捷键被其他程序占用，App 会提示冲突；仍可使用菜单栏图标和菜单。
+- 简短的输入提示面板只在捕获输入期间出现。退出捕获后，按键交回 Mac 正常使用。
+
+在右键菜单中打开完整设置，可以继续使用配对、连接诊断、连接记录、英文测试和手机输入法切换等功能。诊断入口供排查使用，默认 BLE 工作流程无需切换到传统蓝牙。
+
+完整设置中的“开始输入”按钮也会打开简短输入面板；仍可直接点击完整设置里原有的输入区，在该输入区内捕获按键。
+
+可以在完整设置中使用“发送英文测试串”检查手机是否实际显示文字。“已接收按键”包含本地等待发送的报告；计数增长不能代替手机画面的确认。
 
 ### 中文输入
 
-App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、选字。Mac 输入法已经组好的中文不会作为整段文字传过去。“切换手机输入法”按钮发送 `Control + Space`；切换后重新点击“开始输入”。中文输入流程尚未完成实机验证。
+App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、选字。Mac 输入法已经组好的中文不会作为整段文字传过去。完整设置中的“切换手机输入法”按钮发送 `Control + Space`；切换后重新点击菜单栏图标或按全局快捷键开始输入。中文输入流程尚未完成实机验证。
 
 物理键码按 ANSI 布局映射，英文测试串按 US-ANSI 组合发送。其他语言、ISO／JIS 布局和额外硬件按键尚未建立兼容清单；iPhone 当前的硬件键盘布局也会影响最终字符。
 
@@ -90,17 +101,17 @@ App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、�
 zsh package.sh
 ```
 
-输出为 `build/手机键盘-0.3.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
+输出为 `build/手机键盘-0.4.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
 
 安装盘同时附带中文、英文安装使用说明和 MIT 许可证，方便不同语言的用户安装与使用。
 
 也可以打包已经构建的 App，避免重复编译：
 
 ```sh
-zsh package.sh build/手机键盘-0.3.0-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.4.0-通用版.dmg build/手机键盘.app
 ```
 
-目前打包脚本对应 `0.3.0 (5)`。修改版本号时，需要同步调整 `Resources/Info.plist` 与打包脚本的版本检查。
+目前打包脚本对应 `0.4.0 (6)`。修改版本号时，需要同步调整 `Resources/Info.plist` 与打包脚本的版本检查。
 
 ## BLE 实验范围
 
@@ -133,13 +144,15 @@ zsh scripts/check.sh
 python3 scripts/make-localization-previews.py build/手机键盘.app
 ```
 
-预览副本位于 `build/localization-previews/`，使用独立的 App 身份和临时日志目录，不启动蓝牙服务。它们仅供检查文字和布局，不能用来输入手机，也不应作为安装版分发。
+预览副本位于 `build/localization-previews/`，使用独立的 App 身份、临时日志目录和隔离的 `PreviewKeyboardTransport`，不启动任何蓝牙管理器，也不发送到手机。可以在预览中测试界面文字与布局、焦点、全局快捷键、图标状态和本地按键接收计数。这些预览仅供界面和本地按键路由验证，不能验证 iPhone 文字显示，也不应作为安装版分发。
 
 修改简体翻译后，可用 `xcrun swift scripts/generate-traditional-localization.swift` 更新繁体资源值，再审阅生成结果。资源的查找键始终保留不变。
 
 | 路径 | 内容 |
 | --- | --- |
-| `Sources/main.swift` | 本地化 App 界面与前台键盘事件 |
+| `Sources/main.swift` | 本地化菜单栏、完整设置、输入提示面板与前台键盘事件 |
+| `Sources/MenuBarController.swift` | 菜单栏图标、左右键操作与菜单 |
+| `Sources/GlobalHotKey.swift` | 全局输入切换快捷键与冲突处理 |
 | `Sources/KeyMapping.swift` | Mac 键码到 HID 键码的映射 |
 | `Sources/BLEKeyboard.swift` | BLE HID 服务与有界发送队列 |
 | `Sources/BluetoothKeyboard.swift` | 传统蓝牙诊断后端 |
@@ -153,11 +166,11 @@ python3 scripts/make-localization-previews.py build/手机键盘.app
 xcrun swift scripts/generate-icon.swift
 ```
 
-App 不申请辅助功能或输入监控权限，不读取 Apple 账户、剪贴板或通讯录，输入不经过 iCloud 或网络。连接记录仅保存连接事件、错误和计数，不保存输入内容。
+App 仅在主动开启捕获，且输入提示面板或完整设置的输入区获得焦点时接收要转发的按键，不申请辅助功能或输入监控权限，不读取 Apple 账户、剪贴板或通讯录，输入不经过 iCloud 或网络。全局快捷键用于切换捕获状态。连接记录仅保存连接事件、错误和计数，不保存输入内容。
 
 ## English overview
 
-MacPhoneKeys is an experimental native macOS app that lets a Mac keyboard type on an iPhone over Bluetooth Low Energy. The devices may use different Apple IDs, and no iPhone app is required.
+MacPhoneKeys is an experimental native macOS menu bar app that lets a Mac keyboard type on an iPhone over Bluetooth Low Energy. Click its menu bar icon or press Control + Option + K to toggle input. The devices may use different Apple IDs, and no iPhone app is required.
 
 The app supports English, Simplified Chinese and Traditional Chinese, selected from the Mac's preferred supported languages, with English as the fallback. Quit and reopen the app after changing its language. Read the [complete English guide](README.en.md) for building, installation, pairing, controls, troubleshooting and compatibility limits.
 
