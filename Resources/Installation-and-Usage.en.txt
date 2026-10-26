@@ -1,0 +1,107 @@
+MacPhoneKeys 0.2.0 — Installation and usage
+Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
+
+Use a Mac keyboard to type on an iPhone over Bluetooth. The devices may use
+different Apple IDs. No iPhone app is required.
+
+The app is named “手机键盘” in Finder. Its interface currently uses Chinese;
+the English equivalents of its main controls are listed below.
+
+INSTALLATION
+1. If you have a DMG, open it and drag “手机键盘” to Applications.
+2. Open the app from Applications and allow Bluetooth access when prompted.
+3. Eject the disk image after installation. Run only one copy of the app.
+
+To build from source, follow README.en.md at:
+https://github.com/willrong1971/MacPhoneKeys/blob/main/README.en.md
+
+PAIRING AND TYPING
+1. Open the Mac app. It starts its Bluetooth keyboard service automatically.
+2. On the iPhone, open Settings > Bluetooth. Select your Mac's system name
+   and follow the pairing prompts. The name may differ from the app name.
+3. Open Notes or another text editor on the iPhone. Tap a text field so that
+   the insertion cursor is visible. Use an English/US hardware-keyboard layout
+   for the first literal English test.
+4. On the Mac, wait for “开始输入” to become available, click it, then type.
+5. Press Esc or switch to another Mac window to stop relaying input.
+
+If you use an external Bluetooth keyboard, keep it connected to the Mac.
+It can supply the key events relayed by this app, just as the Mac's built-in
+keyboard does.
+
+CONTROLS
+开始输入                 Start Typing
+停止输入（Esc）           Stop Typing
+蓝牙键盘已连接            Bluetooth Keyboard Connected
+启动蓝牙键盘              Start Bluetooth Keyboard Service
+停止蓝牙键盘              Stop Bluetooth Keyboard Service
+打开 Mac 蓝牙设置         Open Mac Bluetooth Settings
+发送英文测试串            Send English Test Text
+切换手机输入法            Switch iPhone Input Method
+已接收按键                Accepted Key Presses
+打开记录文件              Show Log File
+
+“发送英文测试串” asks for confirmation, then types “mac keyboard test 123”
+without pressing Return. “发送测试串” confirms; “取消” cancels.
+The accepted-key count can include queued reports. Check the iPhone's screen
+to confirm that text actually arrived.
+
+INPUT METHODS
+The app sends physical key presses, not text composed by the Mac's input
+method. The iPhone's hardware-keyboard layout and input method determine the
+resulting text. “切换手机输入法” sends Control + Space; click “开始输入” again
+after using it. Chinese composition and other language layouts remain unverified.
+The current physical-key mapping follows an ANSI keyboard layout.
+
+SIGNING AND FIRST LAUNCH
+Source builds use ad-hoc signing by default and do not require your own
+developer certificate. They are not automatically notarized. A historical
+local test package used an Apple Development certificate, which is also not
+the same as a notarized Developer ID distribution.
+If macOS blocks a downloaded app, verify its source and follow the app-specific
+Open Anyway option in Privacy & Security (Security & Privacy on older macOS).
+Keep macOS security protections enabled. Details:
+https://developer.apple.com/developer-id/
+
+COMPATIBILITY AND LIMITS
+Builds contain arm64 and x86_64 code with a macOS 12.0 deployment target.
+This is a build target, not a guarantee that every Mac can act as a BLE keyboard.
+The Mac must support the required Bluetooth peripheral operation.
+
+Typing has been confirmed on one Apple silicon Mac running macOS 26.6.2 and
+one iPhone, including an app installed in Applications. Both its built-in
+keyboard and a connected external Bluetooth keyboard have been used successfully.
+Other Macs, iPhones, OS versions, USB keyboards, non-ANSI layouts, sleep/wake
+reconnection and long-term reliability have not been comprehensively tested.
+
+The BLE Battery service reports a fixed 100% test value, not the Mac's battery
+level. Its PnP manufacturer field is an experimental placeholder.
+
+TROUBLESHOOTING
+If pairing or input fails, check that the app is running, its Bluetooth service
+is started, and Bluetooth access is allowed. Press Esc to stop input, then
+quit normally with Command-Q. Reopen the app and select the Mac on the
+iPhone if needed. Confirm that a
+text field is focused on the iPhone before typing. Use the app's connection
+indicator and an actual text test to identify a working connection.
+
+PRIVACY AND LOGS
+Input is relayed only while the app's input area is focused and capture is
+active. It does not request Accessibility or Input Monitoring access. It does
+not read Apple account data, contacts or the clipboard, and sends no input
+through the internet or iCloud.
+Logs contain connection events, errors and counts, not typed text. Location:
+~/Library/Application Support/MacPhoneKeys/
+
+Stopping capture discards reports still in the app's queue and attempts to
+release held keys. Reports already accepted by the system cannot be recalled.
+
+For bug reports, include OS versions, Mac architecture and reproduction steps.
+Remove personal device names, Bluetooth addresses and account details from logs.
+
+UNINSTALLATION
+Quit the app, then move it from Applications to Trash. Bluetooth pairing
+records are retained; remove the relevant Mac entry on the iPhone if desired.
+
+Source, license and full English guide:
+https://github.com/willrong1971/MacPhoneKeys

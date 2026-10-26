@@ -29,8 +29,13 @@ payload="$staging_dir/payload"
 mkdir -p "$payload"
 ditto "$app_dir" "$payload/手机键盘.app"
 ln -s /Applications "$payload/Applications"
-if [[ -f "$project_dir/Resources/安装与使用.txt" ]]; then
-  cp "$project_dir/Resources/安装与使用.txt" "$payload/安装与使用.txt"
+for guide_file in 安装与使用.txt Installation-and-Usage.en.txt; do
+  if [[ -f "$project_dir/Resources/$guide_file" ]]; then
+    cp "$project_dir/Resources/$guide_file" "$payload/$guide_file"
+  fi
+done
+if [[ -f "$project_dir/LICENSE" ]]; then
+  cp "$project_dir/LICENSE" "$payload/LICENSE"
 fi
 hdiutil create -volname "手机键盘 $version" -srcfolder "$payload" \
   -format UDZO -fs HFS+ -ov "$staging_dir/package.dmg" >&2

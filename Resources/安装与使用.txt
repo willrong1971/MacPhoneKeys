@@ -1,4 +1,7 @@
 手机键盘 0.2.0 · 通用安装版
+Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
+
+English: Installation-and-Usage.en.txt
 
 把 Mac 键盘通过蓝牙连接到 iPhone。两台设备的 Apple ID 可以不同，无需更换；iPhone 无需安装 App。
 

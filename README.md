@@ -1,12 +1,18 @@
 # MacPhoneKeys · 手机键盘
 
+**中文** | [English](README.en.md)
+
 <img src="Resources/AppIcon.png" width="112" alt="MacPhoneKeys 图标">
 
-用 Mac 自带键盘，通过蓝牙给 iPhone 打字。两台设备可以登录不同的 Apple ID；iPhone 无需安装 App。
+用 Mac 上的键盘，通过蓝牙给 iPhone 打字。两台设备可以登录不同的 Apple ID；iPhone 无需安装 App。
+
+已确认 Mac 自带键盘，以及连接到 Mac 的外接蓝牙键盘，都可以作为输入来源。USB 键盘尚未实测。
 
 作者：**九福爸爸 9fbaba**。
 
 这是一个原生 macOS App，使用 Swift、AppKit 和 CoreBluetooth。输入仅在 App 前台的输入区中接收，按 **Esc** 或切换到其他窗口即可停止。
+
+当前 App 界面仍为中文；[完整英文指南](README.en.md)提供安装、连接步骤与界面按钮对照。
 
 ## 当前状态
 
@@ -64,6 +70,8 @@ zsh build.sh
 
 App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、选字。Mac 输入法已经组好的中文不会作为整段文字传过去。“切换手机输入法”按钮发送 `Control + Space`；切换后重新点击“开始输入”。中文输入流程尚未完成实机验证。
 
+物理键码按 ANSI 布局映射，英文测试串按 US-ANSI 组合发送。其他语言、ISO／JIS 布局和额外硬件按键尚未建立兼容清单；iPhone 当前的硬件键盘布局也会影响最终字符。
+
 ## 制作 DMG
 
 重新构建并制作带“Applications”快捷方式的安装盘：
@@ -73,6 +81,8 @@ zsh package.sh
 ```
 
 输出为 `build/手机键盘-0.2.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
+
+安装盘同时附带中文、英文安装使用说明和 MIT 许可证，方便不同语言的用户安装与使用。
 
 也可以打包已经构建的 App，避免重复编译：
 
@@ -149,11 +159,7 @@ App 不申请辅助功能或输入监控权限，不读取 Apple 账户、剪贴
 
 MacPhoneKeys is an experimental native macOS app that lets a Mac keyboard type on an iPhone over Bluetooth Low Energy. The devices may use different Apple IDs, and no iPhone app is required.
 
-Author: **九福爸爸 9fbaba**.
-
-Clone this repository, run `zsh build.sh`, and move `build/手机键盘.app` to Applications. Run `zsh package.sh` to build a DMG. Builds are Universal (`arm64` + `x86_64`) with a macOS 12.0 deployment target. Pair the iPhone with the Mac, focus a text field on the iPhone, then click the app's input button. Press Esc or switch windows to stop.
-
-Physical typing has been confirmed on one Apple silicon Mac running macOS 26.6.2 and one iPhone, including the installed app. Other machines, OS versions and Chinese input remain unverified. The BLE implementation relies on behavior that may differ between macOS versions. Default builds are ad-hoc signed and are not automatically notarized; downloaded builds may trigger Gatekeeper warnings.
+Read the [complete English guide](README.en.md) for building, installation, Bluetooth pairing, Chinese UI translations, troubleshooting and compatibility limits.
 
 ## 许可
 
