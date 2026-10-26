@@ -1,4 +1,4 @@
-手机键盘 0.2.0 · 通用安装版
+手机键盘 0.3.0 (5) · 通用安装版
 Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
 
 English: Installation-and-Usage.en.txt
@@ -6,10 +6,15 @@ English: Installation-and-Usage.en.txt
 把 Mac 键盘通过蓝牙连接到 iPhone。两台设备的 Apple ID 可以不同，无需更换；iPhone 无需安装 App。
 
 安装
-1. 打开“手机键盘-0.2.0-通用版.dmg”。
+1. 打开“手机键盘-0.3.0-通用版.dmg”。
 2. 把“手机键盘”拖到“Applications（应用程序）”。
 3. 在“应用程序”里打开“手机键盘”，允许蓝牙访问。
 4. 安装完成后，可以推出磁盘映像。
+
+界面语言
+App 提供简体中文、繁体中文和英文，使用标准 macOS Bundle 语言资源 en、zh-Hans、zh-Hant。系统会从 Mac 的首选语言中选择 App 支持的语言；没有匹配语言时使用英文。中文名称为“手机键盘”，英文名称为 MacPhoneKeys；构建文件路径仍为 build/手机键盘.app。
+可以调整 Mac 的首选语言；如系统提供，也可在“系统设置 → 通用 → 语言与地区 → 应用程序”中为本 App 选择专用语言。更改后请完全退出并重新打开 App，运行中的界面不会即时切换。不同 macOS 版本的设置位置可能不同。
+界面语言与 iPhone 的输入法、硬件键盘布局分别设置。
 
 首次打开与签名
 从本项目源码自行构建时，默认使用 ad-hoc 临时签名，不需要开发者证书，也不会自动提交 Apple 公证。历史本机测试包曾使用 Apple Development 开发证书签名；它同样不是经过公证的发行包。
@@ -28,7 +33,7 @@ English: Installation-and-Usage.en.txt
 
 兼容范围与验证
 通用二进制包含 Apple 芯片 arm64 和 Intel x86_64 两种架构，最低系统目标为 macOS 12.0，需 Mac 蓝牙支持低功耗外设模式。
-本机 macOS 26.6.2 已实际验证：iPhone 保持加密键盘连接，完整显示固定测试串 mac keyboard test 123；用户使用 Mac 实际键盘手动输入 abc123，也完整显示。
+此前 0.2.0 在本机 macOS 26.6.2 已实际验证：iPhone 保持加密键盘连接，完整显示固定测试串 mac keyboard test 123；用户使用 Mac 实际键盘手动输入 abc123，也完整显示。0.3.0 本次验证了语言选择、离线检查和界面显示，尚未替换现有安装版进行手机输入回归。
 其他 Mac、macOS 12–15、其他 iPhone、中文输入及睡眠后重连尚未逐机实测，无法承诺所有历史型号都能作为蓝牙键盘使用。通用架构编译通过与蓝牙实机可用是两项不同的验证。
 
 范围与记录

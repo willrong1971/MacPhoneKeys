@@ -1,14 +1,25 @@
-MacPhoneKeys 0.2.0 — Installation and usage
+MacPhoneKeys 0.3.0 (5) — Installation and usage
 Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
 
 Use a Mac keyboard to type on an iPhone over Bluetooth. The devices may use
 different Apple IDs. No iPhone app is required.
 
-The app is named “手机键盘” in Finder. Its interface currently uses Chinese;
-the English equivalents of its main controls are listed below.
+The app's English name is MacPhoneKeys; its Chinese name is 手机键盘.
+The build output path remains build/手机键盘.app in every interface language.
+
+INTERFACE LANGUAGE
+Standard macOS Bundle resources provide English (en), Simplified Chinese
+(zh-Hans) and Traditional Chinese (zh-Hant). macOS selects a supported language
+from the Mac's preferred language list; if none matches, the app uses English.
+Change the Mac's preferred languages, or use this app's language setting in
+System Settings > General > Language & Region > Applications if your macOS
+version provides it. Settings and labels vary by macOS version.
+Quit the app completely and reopen it after changing the language. The running
+interface does not switch immediately. This setting does not change the
+iPhone's input method or hardware-keyboard layout.
 
 INSTALLATION
-1. If you have a DMG, open it and drag “手机键盘” to Applications.
+1. Open 手机键盘-0.3.0-通用版.dmg and drag the app to Applications.
 2. Open the app from Applications and allow Bluetooth access when prompted.
 3. Eject the disk image after installation. Run only one copy of the app.
 
@@ -22,35 +33,36 @@ PAIRING AND TYPING
 3. Open Notes or another text editor on the iPhone. Tap a text field so that
    the insertion cursor is visible. Use an English/US hardware-keyboard layout
    for the first literal English test.
-4. On the Mac, wait for “开始输入” to become available, click it, then type.
+4. On the Mac, wait for “Start Typing” to become available, click it, then type.
 5. Press Esc or switch to another Mac window to stop relaying input.
 
 If you use an external Bluetooth keyboard, keep it connected to the Mac.
 It can supply the key events relayed by this app, just as the Mac's built-in
 keyboard does.
 
-CONTROLS
+CONTROLS (SIMPLIFIED CHINESE / ENGLISH INTERFACES)
 开始输入                 Start Typing
-停止输入（Esc）           Stop Typing
+停止输入（Esc）           Stop Typing (Esc)
 蓝牙键盘已连接            Bluetooth Keyboard Connected
-启动蓝牙键盘              Start Bluetooth Keyboard Service
-停止蓝牙键盘              Stop Bluetooth Keyboard Service
-打开 Mac 蓝牙设置         Open Mac Bluetooth Settings
-发送英文测试串            Send English Test Text
+启动蓝牙键盘              Start Keyboard Service
+停止蓝牙键盘              Stop Keyboard Service
+打开 Mac 蓝牙设置         Mac Bluetooth Settings
+发送英文测试串            Send English Test
 切换手机输入法            Switch iPhone Input Method
-已接收按键                Accepted Key Presses
+已接收按键                Accepted keys
 打开记录文件              Show Log File
 
-“发送英文测试串” asks for confirmation, then types “mac keyboard test 123”
-without pressing Return. “发送测试串” confirms; “取消” cancels.
+“Send English Test” asks for confirmation, then types “mac keyboard test 123”
+without pressing Return. “Send Test Text” confirms; “Cancel” cancels.
 The accepted-key count can include queued reports. Check the iPhone's screen
 to confirm that text actually arrived.
 
 INPUT METHODS
 The app sends physical key presses, not text composed by the Mac's input
 method. The iPhone's hardware-keyboard layout and input method determine the
-resulting text. “切换手机输入法” sends Control + Space; click “开始输入” again
-after using it. Chinese composition and other language layouts remain unverified.
+resulting text. “Switch iPhone Input Method” sends Control + Space; click
+“Start Typing” again after using it. Chinese composition and other language
+layouts remain unverified.
 The current physical-key mapping follows an ANSI keyboard layout.
 
 SIGNING AND FIRST LAUNCH
@@ -68,9 +80,11 @@ Builds contain arm64 and x86_64 code with a macOS 12.0 deployment target.
 This is a build target, not a guarantee that every Mac can act as a BLE keyboard.
 The Mac must support the required Bluetooth peripheral operation.
 
-Typing has been confirmed on one Apple silicon Mac running macOS 26.6.2 and
+Typing with version 0.2.0 has been confirmed on one Apple silicon Mac running macOS 26.6.2 and
 one iPhone, including an app installed in Applications. Both its built-in
 keyboard and a connected external Bluetooth keyboard have been used successfully.
+Version 0.3.0 has passed language, offline and UI checks. It has not replaced
+the working installation for a new phone-side typing test.
 Other Macs, iPhones, OS versions, USB keyboards, non-ANSI layouts, sleep/wake
 reconnection and long-term reliability have not been comprehensively tested.
 

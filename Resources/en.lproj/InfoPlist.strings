@@ -1,0 +1,5 @@
+/* App identity and system Bluetooth permission prompts. */
+"CFBundleName" = "MacPhoneKeys";
+"CFBundleDisplayName" = "MacPhoneKeys";
+"NSBluetoothAlwaysUsageDescription" = "Use this Mac's keyboard to type on your paired iPhone over Bluetooth. Your Apple account settings stay unchanged.";
+"NSBluetoothPeripheralUsageDescription" = "Provide a Bluetooth keyboard service to your iPhone.";

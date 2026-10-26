@@ -104,15 +104,15 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         precondition(Thread.isMainThread)
         guard !running else { return }
         guard let controller = IOBluetoothHostController.default() else {
-            state(false, "未找到蓝牙控制器")
+            state(false, TL("未找到蓝牙控制器"))
             return
         }
         guard controller.powerState == kBluetoothHCIPowerStateON else {
-            state(false, "请在系统设置中开启蓝牙")
+            state(false, TL("请在系统设置中开启蓝牙"))
             return
         }
         guard let record = IOBluetoothSDPServiceRecord.publishedServiceRecord(with: Self.serviceDictionary()) else {
-            state(false, "HID 服务发布失败，请检查蓝牙权限")
+            state(false, TL("HID 服务发布失败，请检查蓝牙权限"))
             return
         }
         self.controller = controller
@@ -123,14 +123,14 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         let psmStatus = record.getL2CAPPSM(&actualControl)
         let interruptPSMs = Self.l2capPSMs(in: record.getAttributeDataElement(0x000D))
         guard psmStatus == kIOReturnSuccess, actualControl != 0, let actualInterrupt = interruptPSMs.first else {
-            log("HID SDP 已发布，但无法读取实际 control / interrupt PSM；移除此服务。")
+            log(TL("HID SDP 已发布，但无法读取实际 control / interrupt PSM；移除此服务。"))
             stop()
-            state(false, "无法验证 HID 服务的通道")
+            state(false, TL("无法验证 HID 服务的通道"))
             return
         }
         publishedControlPSM = actualControl
         publishedInterruptPSM = actualInterrupt
-        log(String(format: "HID SDP 实际 PSM：control=0x%04X，interrupt=0x%04X。", actualControl, actualInterrupt))
+        log(String(format: TL("HID SDP 实际 PSM：control=0x%04X，interrupt=0x%04X。"), actualControl, actualInterrupt))
 
         // Subscribe only to the channels belonging to this published service, so that if
         // bluetoothd remaps the PSMs we do not claim an unrelated system keyboard's channel.
@@ -142,13 +142,13 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
                 direction: kIOBluetoothUserNotificationChannelDirectionIncoming
             ) {
                 notifications.append(notification)
-                log(String(format: "传入 PSM 0x%04X 的通知已注册。", psm))
+                log(String(format: TL("传入 PSM 0x%04X 的通知已注册。"), psm))
             } else {
-                log(String(format: "传入 PSM 0x%04X 的通知注册失败。", psm))
+                log(String(format: TL("传入 PSM 0x%04X 的通知注册失败。"), psm))
             }
         }
         if notifications.count != Set([actualControl, actualInterrupt]).count {
-            log("部分传入通道监听注册失败；仍可尝试主动连接已配对 iPhone。")
+            log(TL("部分传入通道监听注册失败；仍可尝试主动连接已配对 iPhone。"))
         }
         if let observer = IOBluetoothL2CAPChannel.register(
             forChannelOpenNotifications: self,
@@ -157,9 +157,9 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
             direction: kIOBluetoothUserNotificationChannelDirectionAny
         ) {
             notifications.append(observer)
-            log("全局 L2CAP 诊断通知已注册（仅观察 PSM 和方向）。")
+            log(TL("全局 L2CAP 诊断通知已注册（仅观察 PSM 和方向）。"))
         } else {
-            log("全局 L2CAP 诊断通知注册失败。")
+            log(TL("全局 L2CAP 诊断通知注册失败。"))
         }
         originalClassOfDevice = controller.classOfDevice()
         renewKeyboardClass()
@@ -168,10 +168,10 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         }
 
         if actualControl == controlPSM && actualInterrupt == interruptPSM {
-            state(false, "等待 iPhone 配对或连接")
+            state(false, TL("等待 iPhone 配对或连接"))
         } else {
-            log("系统分配了其他 PSM，不能视为标准 HID 监听成功。可选择已配对 iPhone 尝试主动连接；无需删除配对。")
-            state(false, "标准 HID 通道被系统占用；可尝试主动连接")
+            log(TL("系统分配了其他 PSM，不能视为标准 HID 监听成功。可选择已配对 iPhone 尝试主动连接；无需删除配对。"))
+            state(false, TL("标准 HID 通道被系统占用；可尝试主动连接"))
         }
     }
 
@@ -187,16 +187,16 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         notifications.removeAll()
         if let serviceRecord {
             let status = serviceRecord.remove()
-            if status != kIOReturnSuccess { log("移除临时 HID 服务失败：\(hex(status))") }
+            if status != kIOReturnSuccess { log(TLF("移除临时 HID 服务失败：%@", hex(status))) }
         }
         serviceRecord = nil
         if let originalClassOfDevice, let controller {
             let status = controller.setClassOfDevice(originalClassOfDevice, forTimeInterval: 120)
-            if status != kIOReturnSuccess { log("恢复蓝牙设备类别失败：\(hex(status))；临时类别将在系统期限后失效。") }
+            if status != kIOReturnSuccess { log(TLF("恢复蓝牙设备类别失败：%@；临时类别将在系统期限后失效。", hex(status))) }
         }
         originalClassOfDevice = nil
         controller = nil
-        state(false, "已停止")
+        state(false, TL("已停止"))
     }
 
     /// Connects to the selected, already-paired host's standard HID channels.
@@ -204,15 +204,15 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
     func connect(address: String) {
         precondition(Thread.isMainThread)
         if !running {
-            state(false, "正在启动键盘服务…")
+            state(false, TL("正在启动键盘服务…"))
             start()
         }
         guard running else {
-            log("键盘服务未启动，无法发起连接；请按当前状态提示处理后重试。")
+            log(TL("键盘服务未启动，无法发起连接；请按当前状态提示处理后重试。"))
             return
         }
         guard let device = IOBluetoothDevice(addressString: address), device.isPaired() else {
-            state(false, "请先在系统蓝牙设置中完成配对")
+            state(false, TL("请先在系统蓝牙设置中完成配对"))
             return
         }
         disconnectChannels(sendRelease: true)
@@ -221,12 +221,12 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         outgoingConnection = true
         controlRequested = false
         interruptRequested = false
-        state(false, "正在连接 \(remoteName)…")
+        state(false, TLF("正在连接 %@…", remoteName))
         let generation = connectionGeneration
         armConnectionTimeout()
-        logDevice("发起连接前", device: device)
+        logDevice(TL("发起连接前"), device: device)
         if device.isConnected() {
-            log("设备已有 ACL 基带链路，继续打开 HID control 通道。")
+            log(TL("设备已有 ACL 基带链路，继续打开 HID control 通道。"))
             openOutgoingControl(generation: generation)
             return
         }
@@ -236,16 +236,16 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         // the shared baseband link. Completion removes only this target.
         pendingACLDelegates.append(delegate)
         let status = device.openConnection(delegate, withPageTimeout: 0x2000, authenticationRequired: true)
-        logDevice("ACL openConnection 返回 \(hex(status)) (\(status))", device: device)
+        logDevice(TLF("ACL openConnection 返回 %@ (%ld)", hex(status), Int(status)), device: device)
         guard running, connectionGeneration == generation else { return }
         if status != kIOReturnSuccess {
             pendingACLDelegates.removeAll { $0 === delegate }
             if device.isConnected() {
-                log("ACL 请求返回非零，但基带链路实际已存在；继续验证 HID 通道。")
+                log(TL("ACL 请求返回非零，但基带链路实际已存在；继续验证 HID 通道。"))
                 openOutgoingControl(generation: generation)
             } else {
                 disconnectChannels(sendRelease: false)
-                state(false, "蓝牙基带连接未建立，请保持 iPhone 蓝牙页面打开后重试")
+                state(false, TL("蓝牙基带连接未建立，请保持 iPhone 蓝牙页面打开后重试"))
             }
         }
     }
@@ -256,16 +256,16 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
             keyboard.pendingACLDelegates.removeAll { ObjectIdentifier($0) == delegateID }
             guard keyboard.running, keyboard.connectionGeneration == generation,
                   let device, let target = keyboard.activeDevice, keyboard.sameDevice(device, target) else { return }
-            keyboard.logDevice("ACL connectionComplete status=\(keyboard.hex(status)) (\(status))", device: device)
+            keyboard.logDevice(TLF("ACL connectionComplete status=%@ (%ld)", keyboard.hex(status), Int(status)), device: device)
             guard status == kIOReturnSuccess || device.isConnected() else {
                 keyboard.disconnectChannels(sendRelease: false)
-                keyboard.state(false, "蓝牙基带连接失败，请在 iPhone 蓝牙页面确认后重试")
+                keyboard.state(false, TL("蓝牙基带连接失败，请在 iPhone 蓝牙页面确认后重试"))
                 return
             }
             if status != kIOReturnSuccess {
-                keyboard.log("ACL 完成回调返回非零但实际链路已存在，继续检查 HID 通道。")
+                keyboard.log(TL("ACL 完成回调返回非零但实际链路已存在，继续检查 HID 通道。"))
             } else if !device.isConnected() {
-                keyboard.log("ACL 回调成功，但连接状态尚未显示为已连接；继续一次 HID 通道验证，输入仍须通过已配对与加密检查。")
+                keyboard.log(TL("ACL 回调成功，但连接状态尚未显示为已连接；继续一次 HID 通道验证，输入仍须通过已配对与加密检查。"))
             }
             keyboard.openOutgoingControl(generation: generation)
         }
@@ -274,12 +274,12 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
     private func openOutgoingControl(generation: UInt64) {
         guard running, connectionGeneration == generation, let device = activeDevice, !controlRequested else { return }
         controlRequested = true
-        log("开始连接已配对设备的 HID control 通道。")
+        log(TL("开始连接已配对设备的 HID control 通道。"))
         let delegate = OutgoingDelegate(owner: self, generation: generation, role: .control)
         controlDelegate = delegate
         var channel: IOBluetoothL2CAPChannel?
         let status = device.openL2CAPChannelAsync(&channel, withPSM: controlPSM, delegate: delegate)
-        logDevice("control openL2CAPChannelAsync 返回 \(hex(status)) (\(status))", device: device)
+        logDevice(TLF("control openL2CAPChannelAsync 返回 %@ (%ld)", hex(status), Int(status)), device: device)
         guard running, connectionGeneration == generation else {
             retireReturnedChannel(channel)
             return
@@ -287,9 +287,9 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         if status == kIOReturnSuccess, channel != nil || controlChannel != nil {
             if controlChannel == nil { controlChannel = channel }
         } else {
-            log("发起 HID control 连接失败：\(hex(status))")
+            log(TLF("发起 HID control 连接失败：%@", hex(status)))
             disconnectChannels(sendRelease: false)
-            state(false, "连接未建立，请在 iPhone 蓝牙设置中确认配对")
+            state(false, TL("连接未建立，请在 iPhone 蓝牙设置中确认配对"))
         }
     }
 
@@ -300,7 +300,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         precondition(Thread.isMainThread)
         guard isConnected, !suspended, let channel = interruptChannel, let activeDevice else { return false }
         guard activeDevice.isPaired(), activeDevice.getEncryptionMode() != 0 else {
-            state(false, "蓝牙链路待加密，已暂停输入")
+            state(false, TL("蓝牙链路待加密，已暂停输入"))
             armConnectionTimeout()
             updateConnectedState()
             return false
@@ -318,9 +318,9 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
             lastInputReport = report
             return true
         }
-        log("HID 输入写入失败：\(hex(result))")
+        log(TLF("HID 输入写入失败：%@", hex(result)))
         disconnectChannels(sendRelease: false)
-        state(false, "输入通道断开，请重新连接")
+        state(false, TL("输入通道断开，请重新连接"))
         return false
     }
 
@@ -336,7 +336,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
     @objc private func observedChannelOpened(_ notification: IOBluetoothUserNotification, channel: IOBluetoothL2CAPChannel) {
         onMain { keyboard in
             guard keyboard.running, keyboard.notifications.contains(where: { $0 === notification }) else { return }
-            keyboard.log(String(format: "观察到 L2CAP 通道：PSM=0x%04X，方向=%@。", channel.psm, channel.isIncoming() ? "传入" : "传出"))
+            keyboard.log(String(format: TL("观察到 L2CAP 通道：PSM=0x%04X，方向=%@。"), channel.psm, channel.isIncoming() ? TL("传入") : TL("传出")))
         }
     }
 
@@ -347,7 +347,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         // control channel identifying the remote host first.
         if channel.psm == publishedInterruptPSM && activeDevice == nil { return }
         if let activeDevice, !sameDevice(activeDevice, device) {
-            log("忽略另一台设备的传入 HID 通道。")
+            log(TL("忽略另一台设备的传入 HID 通道。"))
             return
         }
         if activeDevice == nil {
@@ -370,9 +370,9 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         }
         let status = channel.setDelegate(self)
         if status != kIOReturnSuccess {
-            log("设置传入 HID 通道委托失败：\(hex(status))")
+            log(TLF("设置传入 HID 通道委托失败：%@", hex(status)))
             disconnectChannels(sendRelease: false)
-            state(false, "HID 通道初始化失败")
+            state(false, TL("HID 通道初始化失败"))
         }
         // setDelegate permits the incoming configuration to finish. Wait for the
         // corresponding open-complete callback before reporting a live channel.
@@ -411,22 +411,22 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         let isControl = controlChannel?.objectID == channel.objectID
         let isInterrupt = interruptChannel?.objectID == channel.objectID
         guard isControl || isInterrupt else { return }
-        logDevice("\(isControl ? "control" : "interrupt") openComplete status=\(hex(error)) (\(error))", device: device)
+        logDevice(TLF("%@ openComplete status=%@ (%ld)", isControl ? "control" : "interrupt", hex(error), Int(error)), device: device)
         guard error == kIOReturnSuccess else {
-            log("HID 通道打开失败：\(hex(error))")
+            log(TLF("HID 通道打开失败：%@", hex(error)))
             disconnectChannels(sendRelease: false)
-            state(false, "HID 连接失败，请确认 iPhone 蓝牙状态")
+            state(false, TL("HID 连接失败，请确认 iPhone 蓝牙状态"))
             return
         }
         if isControl {
             controlChannel = channel
             controlOpened = true
-            log("HID control 通道已打开。")
+            log(TL("HID control 通道已打开。"))
             if outgoingConnection && !interruptRequested { openOutgoingInterrupt() }
         } else if isInterrupt {
             interruptChannel = channel
             interruptOpened = true
-            log("HID interrupt 通道已打开。")
+            log(TL("HID interrupt 通道已打开。"))
         } else {
             return
         }
@@ -447,9 +447,9 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
     private func handleChannelClosed(_ channel: IOBluetoothL2CAPChannel?) {
         guard let channel,
               channel.objectID == controlChannel?.objectID || channel.objectID == interruptChannel?.objectID else { return }
-        log("HID 通道已关闭。")
+        log(TL("HID 通道已关闭。"))
         disconnectChannels(sendRelease: false)
-        state(false, running ? "设备已断开；可重新连接" : "已停止")
+        state(false, running ? TL("设备已断开；可重新连接") : TL("已停止"))
     }
 
     func l2capChannelData(_ channel: IOBluetoothL2CAPChannel!, data dataPointer: UnsafeMutableRawPointer!, length dataLength: Int) {
@@ -485,7 +485,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         interruptDelegate = delegate
         var channel: IOBluetoothL2CAPChannel?
         let status = device.openL2CAPChannelAsync(&channel, withPSM: interruptPSM, delegate: delegate)
-        logDevice("interrupt openL2CAPChannelAsync 返回 \(hex(status)) (\(status))", device: device)
+        logDevice(TLF("interrupt openL2CAPChannelAsync 返回 %@ (%ld)", hex(status), Int(status)), device: device)
         guard running, connectionGeneration == generation else {
             retireReturnedChannel(channel)
             return
@@ -493,9 +493,9 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         if status == kIOReturnSuccess, channel != nil || interruptChannel != nil {
             if interruptChannel == nil { interruptChannel = channel }
         } else {
-            log("发起 HID interrupt 连接失败：\(hex(status))")
+            log(TLF("发起 HID interrupt 连接失败：%@", hex(status)))
             disconnectChannels(sendRelease: false)
-            state(false, "HID 输入通道未建立")
+            state(false, TL("HID 输入通道未建立"))
         }
     }
 
@@ -509,8 +509,8 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         guard paired, encryption != 0 else {
             if !securityWaiting {
                 securityWaiting = true
-                log("HID 两通道已建立；paired=\(paired)，encryptionMode=\(encryption)，尚未启用键入。")
-                state(false, paired ? "HID 通道已建立，等待蓝牙链路加密…" : "HID 通道已建立，等待系统完成配对…")
+                log(TLF("HID 两通道已建立；paired=%@，encryptionMode=%ld，尚未启用键入。", String(paired), Int(encryption)))
+                state(false, paired ? TL("HID 通道已建立，等待蓝牙链路加密…") : TL("HID 通道已建立，等待系统完成配对…"))
                 securityCheckTimer?.invalidate()
                 securityCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
                     self?.updateConnectedState()
@@ -525,8 +525,8 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         connectionTimeout?.invalidate()
         connectionTimeout = nil
         lastInputReport = [UInt8](repeating: 0, count: 8)
-        log("HID 两通道属于同一已配对设备；链路 encryptionMode=\(encryption)，启用键入。")
-        state(true, "已连接 \(remoteName)")
+        log(TLF("HID 两通道属于同一已配对设备；链路 encryptionMode=%ld，启用键入。", Int(encryption)))
+        state(true, TLF("已连接 %@", remoteName))
         _ = sendReport(modifiers: 0, keys: [])
     }
 
@@ -537,7 +537,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
             0x10: "HID_CONTROL", 0x40: "GET_REPORT", 0x50: "SET_REPORT",
             0x60: "GET_PROTOCOL", 0x70: "SET_PROTOCOL", 0x80: "GET_IDLE", 0x90: "SET_IDLE"
         ]
-        if let name = transactionNames[transaction] { log("收到 HID 控制事务：\(name)。") }
+        if let name = transactionNames[transaction] { log(TLF("收到 HID 控制事务：%@。", name)) }
         switch transaction {
         case 0x10: // HID_CONTROL has no handshake response.
             switch parameter {
@@ -550,15 +550,15 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
             case 3:
                 _ = sendReport(modifiers: 0, keys: [])
                 suspended = true
-                state(isConnected, "手机已暂停键盘输入")
+                state(isConnected, TL("手机已暂停键盘输入"))
             case 4:
                 suspended = false
-                state(isConnected, "已连接 \(remoteName)")
+                state(isConnected, TLF("已连接 %@", remoteName))
             case 5:
                 // Close this virtual cable without deleting the system's pairing record.
-                log("手机请求断开 HID 虚拟连接；系统配对信息保留。")
+                log(TL("手机请求断开 HID 虚拟连接；系统配对信息保留。"))
                 disconnectChannels(sendRelease: true)
-                state(false, "手机已断开键盘连接")
+                state(false, TL("手机已断开键盘连接"))
             default: break
             }
         case 0x40: // GET_REPORT
@@ -599,7 +599,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         case 0x70: // SET_PROTOCOL: identical 8-byte format in boot and report mode.
             guard parameter <= 1, bytes.count == 1 else { handshake(0x04, channel: channel); return }
             protocolMode = parameter
-            log(parameter == 0 ? "手机选择 Boot 键盘协议。" : "手机选择 Report 键盘协议。")
+            log(parameter == 0 ? TL("手机选择 Boot 键盘协议。") : TL("手机选择 Report 键盘协议。"))
             handshake(0, channel: channel)
         case 0x80: // GET_IDLE
             guard parameter == 0, bytes.count == 1 else { handshake(0x04, channel: channel); return }
@@ -620,7 +620,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
 
     private func handshake(_ result: UInt8, channel: IOBluetoothL2CAPChannel) {
         let status = write([result & 0x0F], to: channel)
-        if status != kIOReturnSuccess { log("HID 握手响应发送失败：\(hex(status))") }
+        if status != kIOReturnSuccess { log(TLF("HID 握手响应发送失败：%@", hex(status))) }
     }
 
     private func write(_ bytes: [UInt8], to channel: IOBluetoothL2CAPChannel) -> IOReturn {
@@ -687,10 +687,10 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         let generation = connectionGeneration
         connectionTimeout = Timer.scheduledTimer(withTimeInterval: 20, repeats: false) { [weak self] _ in
             guard let self, self.connectionGeneration == generation, !self.isConnected else { return }
-            self.log("HID 两通道未在等待期限内建立。")
-            if let device = self.activeDevice { self.logDevice("连接超时现场", device: device) }
+            self.log(TL("HID 两通道未在等待期限内建立。"))
+            if let device = self.activeDevice { self.logDevice(TL("连接超时现场"), device: device) }
             self.disconnectChannels(sendRelease: false)
-            self.state(false, "连接超时；请确认 iPhone 蓝牙页面后重试")
+            self.state(false, TL("连接超时；请确认 iPhone 蓝牙页面后重试"))
         }
     }
 
@@ -698,7 +698,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
         guard let controller, let originalClassOfDevice else { return }
         let keyboardClass: BluetoothClassOfDevice = (originalClassOfDevice & 0xFFE000) | 0x0540
         let status = controller.setClassOfDevice(keyboardClass, forTimeInterval: 120)
-        if status != kIOReturnSuccess { log("临时设置键盘设备类别失败：\(hex(status))；继续尝试 HID 服务连接。") }
+        if status != kIOReturnSuccess { log(TLF("临时设置键盘设备类别失败：%@；继续尝试 HID 服务连接。", hex(status))) }
     }
 
     private func sameDevice(_ first: IOBluetoothDevice, _ second: IOBluetoothDevice) -> Bool {
@@ -723,7 +723,7 @@ final class BluetoothKeyboard: NSObject, IOBluetoothL2CAPChannelDelegate {
 
     private func log(_ message: String) { onLog?(message) }
     private func logDevice(_ prefix: String, device: IOBluetoothDevice) {
-        log("\(prefix)：isConnected=\(device.isConnected())，isPaired=\(device.isPaired())，encryptionMode=\(device.getEncryptionMode())。")
+        log(TLF("%@：isConnected=%@，isPaired=%@，encryptionMode=%ld。", prefix, String(device.isConnected()), String(device.isPaired()), Int(device.getEncryptionMode())))
     }
     private func hex(_ status: IOReturn) -> String { String(format: "0x%08X", UInt32(bitPattern: status)) }
 

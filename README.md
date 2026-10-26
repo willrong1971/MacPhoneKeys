@@ -12,7 +12,15 @@
 
 这是一个原生 macOS App，使用 Swift、AppKit 和 CoreBluetooth。输入仅在 App 前台的输入区中接收，按 **Esc** 或切换到其他窗口即可停止。
 
-当前 App 界面仍为中文；[完整英文指南](README.en.md)提供安装、连接步骤与界面按钮对照。
+当前版本为 **0.3.0 (5)**。App 支持简体中文、繁体中文和英文，会根据 Mac 的首选语言自动选择界面；[完整英文指南](README.en.md)提供英文安装与连接说明。
+
+## 界面语言
+
+App 使用标准 macOS Bundle 语言资源：`en`、`zh-Hans` 和 `zh-Hant`。macOS 会从 Mac 的首选语言中选择 App 支持的语言；没有匹配语言时使用英文。中文名称为“手机键盘”，英文名称为 **MacPhoneKeys**。
+
+可以调整 Mac 的首选语言；如果系统提供 App 专用语言设置，也可以在“系统设置 → 通用 → 语言与地区 → 应用程序”中为本 App 单独选择语言。更改后请完全退出 App，再重新打开；界面不会在运行中即时切换。不同 macOS 版本的设置位置可能不同。
+
+界面语言与 iPhone 的输入法、硬件键盘布局分别设置。切换 App 界面语言不会改变手机的输入语言。
 
 ## 当前状态
 
@@ -22,6 +30,8 @@
 - 固定测试串 `mac keyboard test 123` 完整显示。
 - 用户使用 Mac 实体键盘手动输入 `abc123`，手机完整显示。
 - 安装到“应用程序”后的版本也已确认可以打字。
+
+上述手机输入记录来自 **0.2.0**。本次 **0.3.0** 已通过语言匹配、离线回归和禁用蓝牙的独立界面预览；尚未替换原安装版进行手机输入回归。蓝牙协议数据、连接与发送队列逻辑保持不变。
 
 构建目标为 **macOS 12.0 及以上**，生成包含 **arm64 和 x86_64** 的 Universal App。这个目标表示二进制的架构与最低系统版本，**不代表所有 Mac 和 iPhone 均已验证兼容**。Intel Mac、其他 macOS 版本、其他 iPhone、中文选字及睡眠后重连仍需实测。
 
@@ -44,7 +54,7 @@ cd MacPhoneKeys
 zsh build.sh
 ```
 
-输出为 `build/手机键盘.app`。在 Finder 中把它拖入“应用程序”，再从“应用程序”中打开。为避免混淆连接状态，使用时只运行一份 App。
+输出文件路径固定为 `build/手机键盘.app`，不随界面语言变化。在 Finder 中把它拖入“应用程序”，再从“应用程序”中打开。英文界面中的 App 名称为 MacPhoneKeys。为避免混淆连接状态，使用时只运行一份 App。
 
 首次运行时允许蓝牙访问。如果此前拒绝，可以在系统的隐私设置中为本 App 开启蓝牙权限。
 
@@ -80,17 +90,17 @@ App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、�
 zsh package.sh
 ```
 
-输出为 `build/手机键盘-0.2.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
+输出为 `build/手机键盘-0.3.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
 
 安装盘同时附带中文、英文安装使用说明和 MIT 许可证，方便不同语言的用户安装与使用。
 
 也可以打包已经构建的 App，避免重复编译：
 
 ```sh
-zsh package.sh build/手机键盘-0.2.0-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.3.0-通用版.dmg build/手机键盘.app
 ```
 
-目前打包脚本对应 `0.2.0 (4)`。修改版本号时，需要同步调整 `Resources/Info.plist` 与打包脚本的版本检查。
+目前打包脚本对应 `0.3.0 (5)`。修改版本号时，需要同步调整 `Resources/Info.plist` 与打包脚本的版本检查。
 
 ## BLE 实验范围
 
@@ -115,36 +125,26 @@ macOS 会保留部分标准 GATT 服务；普通短 UUID 注册在本机曾被�
 zsh scripts/check.sh
 ```
 
-也可以分别运行：
+检查覆盖语言选择与资源完整性、键码映射、BLE 发送队列的顺序与取消行为，以及传统蓝牙 SDP 数据。各项检查的编译命令由脚本维护。这些检查无法替代蓝牙配对、手机输入和重连的实机验证。
+
+开发时可在构建后生成独立的界面预览：
 
 ```sh
-mkdir -p build
-
-xcrun swiftc Sources/KeyMapping.swift Tests/KeyMappingTests.swift \
-  -o build/KeyMappingTests
-./build/KeyMappingTests
-
-xcrun swiftc -parse-as-library Sources/BLEKeyboard.swift \
-  Tests/BLEInputReportQueueTests.swift -framework CoreBluetooth \
-  -o build/BLEInputReportQueueTests
-./build/BLEInputReportQueueTests
-
-xcrun swiftc -D HID_SDP_TESTS -parse-as-library \
-  Sources/BluetoothKeyboard.swift Tests/SDPTests.swift \
-  -framework Foundation -framework IOBluetooth -o build/SDPTests
-./build/SDPTests
+python3 scripts/make-localization-previews.py build/手机键盘.app
 ```
 
-检查覆盖键码映射、BLE 发送队列的顺序与取消行为，以及传统蓝牙 SDP 数据。这些检查无法替代蓝牙配对、手机输入和重连的实机验证。
+预览副本位于 `build/localization-previews/`，使用独立的 App 身份和临时日志目录，不启动蓝牙服务。它们仅供检查文字和布局，不能用来输入手机，也不应作为安装版分发。
+
+修改简体翻译后，可用 `xcrun swift scripts/generate-traditional-localization.swift` 更新繁体资源值，再审阅生成结果。资源的查找键始终保留不变。
 
 | 路径 | 内容 |
 | --- | --- |
-| `Sources/main.swift` | App 界面与前台键盘事件 |
+| `Sources/main.swift` | 本地化 App 界面与前台键盘事件 |
 | `Sources/KeyMapping.swift` | Mac 键码到 HID 键码的映射 |
 | `Sources/BLEKeyboard.swift` | BLE HID 服务与有界发送队列 |
 | `Sources/BluetoothKeyboard.swift` | 传统蓝牙诊断后端 |
 | `Tests/` | 不连接设备的检查 |
-| `Resources/` | App 信息、图标和安装说明 |
+| `Resources/` | App 信息、图标、安装说明，以及 `en`／`zh-Hans`／`zh-Hant` 语言资源 |
 | `scripts/generate-icon.swift` | 原创几何图标的重建脚本 |
 
 重建图标：
@@ -159,7 +159,7 @@ App 不申请辅助功能或输入监控权限，不读取 Apple 账户、剪贴
 
 MacPhoneKeys is an experimental native macOS app that lets a Mac keyboard type on an iPhone over Bluetooth Low Energy. The devices may use different Apple IDs, and no iPhone app is required.
 
-Read the [complete English guide](README.en.md) for building, installation, Bluetooth pairing, Chinese UI translations, troubleshooting and compatibility limits.
+The app supports English, Simplified Chinese and Traditional Chinese, selected from the Mac's preferred supported languages, with English as the fallback. Quit and reopen the app after changing its language. Read the [complete English guide](README.en.md) for building, installation, pairing, controls, troubleshooting and compatibility limits.
 
 ## 许可
 

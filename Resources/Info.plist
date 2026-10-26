@@ -2,16 +2,18 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>CFBundleIdentifier</key><string>local.will.MacPhoneKeys</string>
-  <key>CFBundleName</key><string>手机键盘</string>
-  <key>CFBundleDisplayName</key><string>手机键盘</string>
+  <key>CFBundleName</key><string>MacPhoneKeys</string>
+  <key>CFBundleDisplayName</key><string>MacPhoneKeys</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>zh-Hans</string><string>zh-Hant</string></array>
   <key>NSHumanReadableCopyright</key><string>Copyright © 2026 九福爸爸 9fbaba. MIT License.</string>
   <key>CFBundleExecutable</key><string>MacPhoneKeys</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.2.0</string>
-  <key>CFBundleVersion</key><string>4</string>
+  <key>CFBundleShortVersionString</key><string>0.3.0</string>
+  <key>CFBundleVersion</key><string>5</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSBluetoothAlwaysUsageDescription</key><string>将本机键盘按键通过蓝牙发送到你配对的 iPhone。不会修改 Apple 账户。</string>
-  <key>NSBluetoothPeripheralUsageDescription</key><string>向 iPhone 提供蓝牙键盘服务。</string>
+  <key>NSBluetoothAlwaysUsageDescription</key><string>Use this Mac's keyboard to type on your paired iPhone over Bluetooth. Your Apple account settings stay unchanged.</string>
+  <key>NSBluetoothPeripheralUsageDescription</key><string>Provide a Bluetooth keyboard service to your iPhone.</string>
 </dict></plist>

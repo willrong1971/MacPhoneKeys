@@ -22,8 +22,11 @@ mkdir -p "$staged_app/Contents/MacOS" "$staged_app/Contents/Resources" "$staging
 
 # Both architectures must use the same saved source snapshot, even if editing
 # continues while the first compiler is running.
-for source_file in KeyMapping.swift BluetoothKeyboard.swift BLEKeyboard.swift main.swift; do
+for source_file in Localization.swift KeyMapping.swift BluetoothKeyboard.swift BLEKeyboard.swift main.swift; do
   cp "$project_dir/Sources/$source_file" "$staging_dir/Sources/$source_file"
+done
+for localization_dir in "$project_dir"/Resources/*.lproj(N/); do
+  ditto "$localization_dir" "$staged_app/Contents/Resources/${localization_dir:t}"
 done
 cp "$project_dir/Resources/Info.plist" "$staged_app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :LSMinimumSystemVersion $minimum_macos" "$staged_app/Contents/Info.plist"
@@ -43,7 +46,8 @@ for target_arch in arm64 x86_64; do
     -target "$target_arch-apple-macos$minimum_macos" \
     -module-cache-path "$staging_dir/ModuleCache/$target_arch" \
     -framework AppKit -framework CoreBluetooth -framework IOBluetooth -framework IOBluetoothUI \
-    "$staging_dir/Sources/KeyMapping.swift" "$staging_dir/Sources/BluetoothKeyboard.swift" \
+    "$staging_dir/Sources/Localization.swift" "$staging_dir/Sources/KeyMapping.swift" \
+    "$staging_dir/Sources/BluetoothKeyboard.swift" \
     "$staging_dir/Sources/BLEKeyboard.swift" "$staging_dir/Sources/main.swift" \
     -o "$staging_dir/MacPhoneKeys-$target_arch"
 done

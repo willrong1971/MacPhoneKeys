@@ -1,15 +1,23 @@
-手机键盘 0.2.0 源码
+手机键盘 / MacPhoneKeys 0.3.0 (5) 源码
 
 需要完整 Xcode 或支持本项目 API 的 Xcode 命令行工具。
 
 构建 Universal App（arm64 + x86_64，最低 macOS 12.0）：
   zsh build.sh
+输出路径固定为 build/手机键盘.app，不随界面语言变化。
+
+界面语言：
+采用标准 macOS Bundle 语言资源 en、zh-Hans、zh-Hant，提供英文、简体中文和繁体中文。系统从 Mac 的首选语言中选择本 App 支持的语言，没有匹配时使用英文。中文名称为“手机键盘”，英文名称为 MacPhoneKeys。
+更改系统首选语言后，需要完全退出并重新打开 App；如 macOS 提供 App 专用语言设置，也可单独选择本 App 的语言。运行中的界面不会即时切换。此设置与 iPhone 的输入法和硬件键盘布局无关。
 
 制作带 Applications 快捷方式的 DMG：
   zsh package.sh
+默认输出为 build/手机键盘-0.3.0-通用版.dmg。
 
 也可以为已有 App 打包：
-  zsh package.sh /绝对路径/手机键盘-0.2.0-通用版.dmg /绝对路径/手机键盘.app
+  zsh package.sh /绝对路径/手机键盘-0.3.0-通用版.dmg /绝对路径/手机键盘.app
+
+版本信息为 0.3.0，构建号为 5。以后调整版本时，请同步维护 Resources/Info.plist 与 package.sh 的版本检查。
 
 签名：
 默认使用 ad-hoc 签名，仅适合开发检查。可以设置 MACPHONEKEYS_SIGN_IDENTITY 为钥匙串中已有证书的完整名称，再运行上述脚本。
@@ -22,10 +30,8 @@ Apple Development 证书不是 Developer ID 发行证书。脚本不会创建证
 本项目保留了传统蓝牙诊断后端，但默认使用实机成功的 BLE 路径。
 命令行参数 --diagnostics 显示连接方式实验入口；普通用户无需使用。
 
-离线检查（先 mkdir -p build）：
-  xcrun swiftc Sources/KeyMapping.swift Tests/KeyMappingTests.swift -o build/KeyMappingTests
-  ./build/KeyMappingTests
-  xcrun swiftc -parse-as-library Sources/BLEKeyboard.swift Tests/BLEInputReportQueueTests.swift -o build/BLEInputReportQueueTests -framework CoreBluetooth
-  ./build/BLEInputReportQueueTests
-  xcrun swiftc -D HID_SDP_TESTS -parse-as-library Sources/BluetoothKeyboard.swift Tests/SDPTests.swift -o build/SDPTests -framework Foundation -framework IOBluetooth
-  ./build/SDPTests
+离线检查：
+  zsh scripts/check.sh
+各项检查的编译命令由该脚本维护。检查覆盖键码映射、BLE 队列顺序与取消行为，以及传统蓝牙 SDP 数据；不会启动 App、连接手机或操作蓝牙，不能替代蓝牙配对、手机实际显示文字和重连的实机验证。
+
+作者：九福爸爸 9fbaba。采用 MIT License，具体条件见 LICENSE。

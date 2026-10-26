@@ -1,0 +1,5 @@
+/* App identity and system Bluetooth permission prompts. */
+"CFBundleName" = "手機鍵盤";
+"CFBundleDisplayName" = "手機鍵盤";
+"NSBluetoothAlwaysUsageDescription" = "將本機鍵盤按鍵透過藍牙傳送到你配對的 iPhone。不會修改 Apple 帳號。";
+"NSBluetoothPeripheralUsageDescription" = "向 iPhone 提供藍牙鍵盤服務。";

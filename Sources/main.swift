@@ -49,8 +49,8 @@ final class KeyboardSurface: NSView {
         let border = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 12, yRadius: 12)
         border.lineWidth = active ? 2 : 1
         border.stroke()
-        let title = active ? "正在将按键发送到 iPhone" : "连接后，点这里开始输入"
-        let detail = active ? "按 Esc 停止 · 切到其他窗口会自动停止" : "手机先打开备忘录，点一下正文输入位置"
+        let title = active ? L("正在将按键发送到 iPhone") : L("连接后，点这里开始输入")
+        let detail = active ? L("按 Esc 停止 · 切到其他窗口会自动停止") : L("手机先打开备忘录，点一下正文输入位置")
         let style = NSMutableParagraphStyle(); style.alignment = .center
         (title as NSString).draw(in: NSRect(x: 10, y: 65, width: bounds.width - 20, height: 30),
                                  withAttributes: [.font: NSFont.systemFont(ofSize: 19, weight: .medium), .foregroundColor: NSColor.labelColor, .paragraphStyle: style])
@@ -60,6 +60,9 @@ final class KeyboardSurface: NSView {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCentralManagerDelegate {
+    // UI validation uses an isolated bundle with this flag. It never starts a
+    // Bluetooth manager or writes to the installed app's runtime directory.
+    let isLocalizationPreview = Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysLocalizationPreview") as? Bool == true
     var transport: KeyboardTransport = BLEKeyboard(useExpandedServiceUUID: true)
     var transportMode = 2
     var transportGeneration = UUID()
@@ -75,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var testGeneration = UUID()
     var isTesting = false
     var lastCapsLockState = false
-    var status = "尚未启动"
+    var status = L("尚未启动")
     var lines: [String] = []
     var surface: KeyboardSurface!
     var stateLabel: NSTextField!
@@ -92,7 +95,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var deviceRow: NSStackView!
     var devicePicker: NSPopUpButton!
     var logView: NSTextView!
-    let rootURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("MacPhoneKeys", isDirectory: true)
+    let rootURL: URL = {
+        if Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysLocalizationPreview") as? Bool == true {
+            return FileManager.default.temporaryDirectory.appendingPathComponent("MacPhoneKeysLocalizationPreview-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("MacPhoneKeys", isDirectory: true)
+    }()
     var logURL: URL { rootURL.appendingPathComponent("验证记录.log") }
     var stateURL: URL { rootURL.appendingPathComponent("连接状态.json") }
 
@@ -100,13 +108,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         buildUI()
         attachTransportCallbacks()
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发版"
-        appendLog("手机键盘 \(version) 启动；仅记录连接事件和计数，不记录输入内容。")
-        appendLog("系统：\(ProcessInfo.processInfo.operatingSystemVersionString)")
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? L("开发版")
+        appendLog(LF("手机键盘 %@ 启动；仅记录连接事件和计数，不记录输入内容。", version))
+        appendLog(LF("系统：%@", ProcessInfo.processInfo.operatingSystemVersionString))
+        if isLocalizationPreview { status = L("界面预览：未启动蓝牙服务") }
         updateUI()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.startService() }
+        if !isLocalizationPreview {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.startService() }
+        }
     }
 
     func attachTransportCallbacks() {
@@ -150,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         let contentHeight = min(760, max(620, availableHeight - 70))
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 750, height: contentHeight),
                           styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        window.title = "手机键盘"
+        window.title = L("手机键盘")
         window.minSize = NSSize(width: 700, height: 620)
         window.center()
         window.delegate = self
@@ -165,17 +176,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
             stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -22)
         ])
 
-        stack.addArrangedSubview(label("用 Mac 键盘给 iPhone 打字", size: 25, weight: .semibold))
-        stack.addArrangedSubview(label("通过蓝牙连接。无需更换 Apple ID，无需在 iPhone 安装 App。", color: .secondaryLabelColor))
-        stateLabel = label("尚未启动", size: 17, weight: .medium)
+        stack.addArrangedSubview(label(L("用 Mac 键盘给 iPhone 打字"), size: 25, weight: .semibold))
+        stack.addArrangedSubview(label(L("通过蓝牙连接。无需更换 Apple ID，无需在 iPhone 安装 App。"), color: .secondaryLabelColor))
+        stateLabel = label(L("尚未启动"), size: 17, weight: .medium)
         stack.addArrangedSubview(stateLabel)
-        detailLabel = label("先启动服务，再打开两台设备的蓝牙设置完成配对。", color: .secondaryLabelColor)
+        detailLabel = label(L("先启动服务，再打开两台设备的蓝牙设置完成配对。"), color: .secondaryLabelColor)
         stack.addArrangedSubview(detailLabel)
 
-        startButton = button("启动蓝牙键盘", #selector(toggleService))
-        let bluetooth = button("打开 Mac 蓝牙设置", #selector(openBluetoothSettings))
-        pairButton = button("查找／配对 iPhone", #selector(pairPhone))
-        modeButton = button("低功耗蓝牙测试", #selector(nextTransport))
+        startButton = button(L("启动蓝牙键盘"), #selector(toggleService))
+        let bluetooth = button(L("打开 Mac 蓝牙设置"), #selector(openBluetoothSettings))
+        bluetooth.isEnabled = !isLocalizationPreview
+        pairButton = button(L("查找／配对 iPhone"), #selector(pairPhone))
+        modeButton = button(L("低功耗蓝牙测试"), #selector(nextTransport))
         let topButtons = NSStackView(views: [startButton, bluetooth, pairButton, modeButton]); topButtons.spacing = 8
         stack.addArrangedSubview(topButtons)
 
@@ -184,10 +196,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         stack.addArrangedSubview(instructionsLabel)
 
         devicePicker = NSPopUpButton(); devicePicker.translatesAutoresizingMaskIntoConstraints = false
-        devicePicker.addItem(withTitle: "点“刷新”读取已配对的 iPhone")
+        devicePicker.addItem(withTitle: L("点“刷新”读取已配对的 iPhone"))
         devicePicker.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        connectButton = button("连接所选手机", #selector(connectSelected))
-        let refresh = button("刷新", #selector(refreshDevices))
+        connectButton = button(L("连接所选手机"), #selector(connectSelected))
+        let refresh = button(L("刷新"), #selector(refreshDevices))
+        refresh.isEnabled = !isLocalizationPreview
         deviceRow = NSStackView(views: [devicePicker, refresh, connectButton]); deviceRow.spacing = 8
         stack.addArrangedSubview(deviceRow)
         deviceRow.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
@@ -196,15 +209,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         stack.addArrangedSubview(surface)
         surface.heightAnchor.constraint(equalToConstant: 128).isActive = true
         surface.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        captureButton = button("开始输入", #selector(toggleCapture))
-        testButton = button("发送英文测试串", #selector(sendTest))
-        languageButton = button("切换手机输入法", #selector(switchPhoneLanguage))
-        countLabel = label("已接收按键：0", color: .secondaryLabelColor)
+        captureButton = button(L("开始输入"), #selector(toggleCapture))
+        testButton = button(L("发送英文测试串"), #selector(sendTest))
+        languageButton = button(L("切换手机输入法"), #selector(switchPhoneLanguage))
+        countLabel = label(L("已接收按键：0"), color: .secondaryLabelColor)
         let inputButtons = NSStackView(views: [captureButton, testButton, languageButton, countLabel]); inputButtons.spacing = 10
         stack.addArrangedSubview(inputButtons)
-        stack.addArrangedSubview(label("中文使用 iPhone 的输入法。按 Esc 或切到其他窗口，即可停止输入。", color: .secondaryLabelColor))
+        stack.addArrangedSubview(label(L("中文使用 iPhone 的输入法。按 Esc 或切到其他窗口，即可停止输入。"), color: .secondaryLabelColor))
 
-        let logTitle = NSStackView(views: [label("连接记录", weight: .medium), button("打开记录文件", #selector(openLog))]); logTitle.spacing = 12
+        let logTitle = NSStackView(views: [label(L("连接记录"), weight: .medium), button(L("打开记录文件"), #selector(openLog))]); logTitle.spacing = 12
         stack.addArrangedSubview(logTitle)
         let scroll = NSScrollView(); scroll.hasVerticalScroller = true; scroll.borderType = .bezelBorder
         scroll.translatesAutoresizingMaskIntoConstraints = false
@@ -219,23 +232,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
 
         let menu = NSMenu()
         let appMenu = NSMenuItem(); menu.addItem(appMenu)
-        let submenu = NSMenu(title: "手机键盘"); appMenu.submenu = submenu
-        submenu.addItem(withTitle: "关于手机键盘", action: #selector(showAbout), keyEquivalent: "")
+        let submenu = NSMenu(title: L("手机键盘")); appMenu.submenu = submenu
+        submenu.addItem(withTitle: L("关于手机键盘"), action: #selector(showAbout), keyEquivalent: "")
         submenu.addItem(.separator())
-        submenu.addItem(withTitle: "隐藏手机键盘", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        let hideOthers = submenu.addItem(withTitle: "隐藏其他", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        submenu.addItem(withTitle: L("隐藏手机键盘"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = submenu.addItem(withTitle: L("隐藏其他"), action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthers.keyEquivalentModifierMask = [.command, .option]
-        submenu.addItem(withTitle: "显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        submenu.addItem(withTitle: L("显示全部"), action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         submenu.addItem(.separator())
-        submenu.addItem(withTitle: "退出手机键盘", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        submenu.addItem(withTitle: L("退出手机键盘"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let windowMenuItem = NSMenuItem(); menu.addItem(windowMenuItem)
-        let windowMenu = NSMenu(title: "窗口"); windowMenuItem.submenu = windowMenu
-        windowMenu.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windowMenu.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        let windowMenu = NSMenu(title: L("窗口")); windowMenuItem.submenu = windowMenu
+        windowMenu.addItem(withTitle: L("最小化"), action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: L("缩放"), action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
         NSApp.windowsMenu = windowMenu
         let helpMenuItem = NSMenuItem(); menu.addItem(helpMenuItem)
-        let helpMenu = NSMenu(title: "帮助"); helpMenuItem.submenu = helpMenu
-        helpMenu.addItem(withTitle: "连接与使用说明", action: #selector(showHelp), keyEquivalent: "")
+        let helpMenu = NSMenu(title: L("帮助")); helpMenuItem.submenu = helpMenu
+        helpMenu.addItem(withTitle: L("连接与使用说明"), action: #selector(showHelp), keyEquivalent: "")
         NSApp.helpMenu = helpMenu
         NSApp.mainMenu = menu
     }
@@ -243,32 +256,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     @objc func showAbout() {
         endCapture(); cancelTest()
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "手机键盘",
-            .credits: NSAttributedString(string: "用 Mac 的键盘，通过蓝牙给 iPhone 输入。\n无需更换 Apple ID。")
+            .applicationName: L("手机键盘"),
+            .credits: NSAttributedString(string: L("用 Mac 的键盘，通过蓝牙给 iPhone 输入。\n无需更换 Apple ID。"))
         ])
     }
 
     @objc func showHelp() {
         cancelTest(); endCapture()
         let alert = NSAlert()
-        alert.messageText = "用 Mac 键盘给 iPhone 打字"
-        alert.informativeText = "1. 允许手机键盘使用蓝牙。\n2. iPhone 打开“设置 → 蓝牙”，选择这台 Mac 的名称并完成配对。\n3. 在 iPhone 的备忘录等 App 中点一下文字输入位置。\n4. 回到 Mac，点“开始输入”后打字；按 Esc 停止。\n\n中文使用 iPhone 的输入法，可点“切换手机输入法”发送切换快捷键。两个 Apple ID 无需更改。"
-        alert.addButton(withTitle: "知道了")
+        alert.messageText = L("用 Mac 键盘给 iPhone 打字")
+        alert.informativeText = L("1. 允许手机键盘使用蓝牙。\n2. iPhone 打开“设置 → 蓝牙”，选择这台 Mac 的名称并完成配对。\n3. 在 iPhone 的备忘录等 App 中点一下文字输入位置。\n4. 回到 Mac，点“开始输入”后打字；按 Esc 停止。\n\n中文使用 iPhone 的输入法，可点“切换手机输入法”发送切换快捷键。两个 Apple ID 无需更改。")
+        alert.addButton(withTitle: L("知道了"))
         alert.runModal()
     }
 
     @objc func toggleService() {
         if isStarted {
             cancelTest()
-            endCapture(); transport.stop(); isStarted = false; isConnected = false; status = "已停止"; updateUI()
+            endCapture(); transport.stop(); isStarted = false; isConnected = false; status = L("已停止"); updateUI()
         } else { startService() }
     }
 
     func startService() {
+        guard !isLocalizationPreview else { return }
         guard !isStarted else { return }
         if central == nil { central = CBCentralManager(delegate: self, queue: .main) }
         isStarted = true
-        status = "正在启动蓝牙键盘服务"
+        status = L("正在启动蓝牙键盘服务")
         updateUI()
         transport.start()
     }
@@ -276,12 +290,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         let description: String
         switch central.state {
-        case .poweredOn: description = "蓝牙已开启"
-        case .poweredOff: description = "蓝牙未开启，请在系统设置中打开"
-        case .unauthorized: description = "蓝牙权限未允许，请在系统设置 → 隐私与安全性 → 蓝牙中允许手机键盘"
-        case .unsupported: description = "系统未提供所需蓝牙能力"
-        case .resetting: description = "系统蓝牙正在重新初始化"
-        default: description = "正在读取蓝牙状态"
+        case .poweredOn: description = L("蓝牙已开启")
+        case .poweredOff: description = L("蓝牙未开启，请在系统设置中打开")
+        case .unauthorized: description = L("蓝牙权限未允许，请在系统设置 → 隐私与安全性 → 蓝牙中允许手机键盘")
+        case .unsupported: description = L("系统未提供所需蓝牙能力")
+        case .resetting: description = L("系统蓝牙正在重新初始化")
+        default: description = L("正在读取蓝牙状态")
         }
         appendLog(description)
         if central.state == .unauthorized || central.state == .poweredOff { status = description; updateUI() }
@@ -292,6 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     @objc func nextTransport() {
+        guard !isLocalizationPreview else { return }
         cancelTest(); endCapture()
         transport.stop()
         transport.onLog = nil; transport.onStateChange = nil
@@ -301,21 +316,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         if transportMode == 0 { transport = BluetoothKeyboard() }
         else { transport = BLEKeyboard(useExpandedServiceUUID: transportMode == 2) }
         attachTransportCallbacks()
-        appendLog("切换连接方式：\(transportMode == 0 ? "传统蓝牙" : transportMode == 1 ? "低功耗蓝牙标准服务实验" : "低功耗蓝牙完整 UUID 服务实验")。")
+        appendLog(LF("切换连接方式：%@。", transportMode == 0 ? L("传统蓝牙") : transportMode == 1 ? L("低功耗蓝牙标准服务实验") : L("低功耗蓝牙完整 UUID 服务实验")))
         startService()
     }
 
     @objc func pairPhone() {
+        guard !isLocalizationPreview else { return }
         guard transportMode == 0 else { return }
         cancelTest(); endCapture()
         if !isStarted { startService() }
         guard let picker = IOBluetoothDeviceSelectorController.deviceSelector() else {
-            appendLog("系统配对窗口无法打开，请使用 Mac 蓝牙设置配对。")
+            appendLog(L("系统配对窗口无法打开，请使用 Mac 蓝牙设置配对。"))
             return
         }
-        picker.setTitle("选择你的 iPhone")
-        picker.setHeader("请在 iPhone 上打开“设置 → 蓝牙”，再选择你自己的手机。")
-        picker.setDescriptionText("只与选中的设备配对。请核对两端显示的配对码。")
+        picker.setTitle(L("选择你的 iPhone"))
+        picker.setHeader(L("请在 iPhone 上打开“设置 → 蓝牙”，再选择你自己的手机。"))
+        picker.setDescriptionText(L("只与选中的设备配对。请核对两端显示的配对码。"))
         picker.clearAllowedUUIDs()
         picker.setOptions(IOBluetoothServiceBrowserControllerOptions(kIOBluetoothServiceBrowserControllerOptionsAutoStartInquiry))
         guard picker.runModal() == kIOBluetoothUISuccess,
@@ -325,37 +341,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         for item in devicePicker.itemArray where item.representedObject as? String == address {
             devicePicker.select(item)
         }
-        appendLog("系统设备选择已完成；将尝试建立所选手机的 HID 通道。")
+        appendLog(L("系统设备选择已完成；将尝试建立所选手机的 HID 通道。"))
         transport.connect(address: address)
     }
 
     @objc func refreshDevices() {
+        guard !isLocalizationPreview else { return }
         guard transportMode == 0, !refreshingDevices else { return }
         let previous = devicePicker.selectedItem?.representedObject as? String
         refreshingDevices = true
         DispatchQueue.global(qos: .userInitiated).async {
             let devices = ((IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice]) ?? []).compactMap { device -> (name: String, address: String)? in
                 guard let address = device.addressString else { return nil }
-                return (device.name ?? "未命名设备", address)
+                return (device.name ?? L("未命名设备"), address)
             }.sorted { $0.name < $1.name }
             DispatchQueue.main.async {
                 self.refreshingDevices = false
                 guard self.transportMode == 0 else { return }
                 self.devicePicker.removeAllItems()
-                self.devicePicker.addItem(withTitle: "选择已配对的 iPhone")
+                self.devicePicker.addItem(withTitle: L("选择已配对的 iPhone"))
                 for device in devices {
                     self.devicePicker.addItem(withTitle: device.name)
                     self.devicePicker.lastItem?.representedObject = device.address
                     if previous == device.address { self.devicePicker.select(self.devicePicker.lastItem) }
                 }
-                self.appendLog("已刷新配对设备列表（\(devices.count) 台）；尚未确认手机输入。")
+                self.appendLog(LF("已刷新配对设备列表（%ld 台）；尚未确认手机输入。", devices.count))
             }
         }
     }
 
     @objc func connectSelected() {
+        guard !isLocalizationPreview else { return }
         guard let address = devicePicker.selectedItem?.representedObject as? String else {
-            status = "请先完成配对，再刷新并选择 iPhone"; updateUI(); return
+            status = L("请先完成配对，再刷新并选择 iPhone"); updateUI(); return
         }
         if !isStarted { startService() }
         cancelTest(); endCapture()
@@ -363,29 +381,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     func updateUI() {
-        stateLabel.stringValue = isConnected ? "蓝牙键盘已连接" : status.replacingOccurrences(of: "BLE 实验：", with: "")
+        stateLabel.stringValue = isConnected ? L("蓝牙键盘已连接") : status.replacingOccurrences(of: L("BLE 实验："), with: "")
         stateLabel.textColor = isConnected ? .systemGreen : .labelColor
         detailLabel.stringValue = transportMode == 0
-            ? "在 iPhone 蓝牙列表中查找：\(transport.hostName)"
-            : "iPhone 蓝牙列表通常显示为：\(Host.current().localizedName ?? "这台 Mac")"
-        pairButton.isEnabled = transportMode == 0
+            ? LF("在 iPhone 蓝牙列表中查找：%@", transport.hostName)
+            : LF("iPhone 蓝牙列表通常显示为：%@", Host.current().localizedName ?? L("这台 Mac"))
+        startButton.isEnabled = !isLocalizationPreview
+        modeButton.isEnabled = !isLocalizationPreview
+        pairButton.isEnabled = transportMode == 0 && !isLocalizationPreview
         pairButton.isHidden = transportMode != 0
         modeButton.isHidden = !CommandLine.arguments.contains("--diagnostics")
         deviceRow.isHidden = transportMode != 0
         if transportMode == 0 {
-            instructionsLabel.stringValue = "① iPhone：设置 → 蓝牙，保持这个页面打开。\n② 在其他设备中选择这台 Mac，并核对系统显示的配对码。\n③ 若已配对，在下面选择 iPhone，点“连接所选手机”。"
-            modeButton.title = "低功耗蓝牙测试"
+            instructionsLabel.stringValue = L("① iPhone：设置 → 蓝牙，保持这个页面打开。\n② 在其他设备中选择这台 Mac，并核对系统显示的配对码。\n③ 若已配对，在下面选择 iPhone，点“连接所选手机”。")
+            modeButton.title = L("低功耗蓝牙测试")
         } else {
-            instructionsLabel.stringValue = "① iPhone：设置 → 蓝牙，选择这台 Mac 的名称并完成配对。\n② 在手机的备忘录等 App 中，点一下要输入文字的位置。\n③ 下方“开始输入”亮起后，点它即可用 Mac 键盘打字。"
-            modeButton.title = transportMode == 1 ? "试完整 UUID 方式" : "返回传统蓝牙"
+            instructionsLabel.stringValue = L("① iPhone：设置 → 蓝牙，选择这台 Mac 的名称并完成配对。\n② 在手机的备忘录等 App 中，点一下要输入文字的位置。\n③ 下方“开始输入”亮起后，点它即可用 Mac 键盘打字。")
+            modeButton.title = transportMode == 1 ? L("试完整 UUID 方式") : L("返回传统蓝牙")
         }
-        startButton.title = isStarted ? "停止蓝牙键盘" : "启动蓝牙键盘"
+        startButton.title = isStarted ? L("停止蓝牙键盘") : L("启动蓝牙键盘")
         captureButton.isEnabled = isConnected && !isTesting
-        captureButton.title = capturing ? "停止输入（Esc）" : "开始输入"
+        captureButton.title = capturing ? L("停止输入（Esc）") : L("开始输入")
         testButton.isEnabled = isConnected && !capturing && !isTesting
         languageButton.isEnabled = isConnected && !isTesting
-        connectButton.isEnabled = !capturing && !isTesting
-        countLabel.stringValue = "已接收按键：\(sentCount)"
+        connectButton.isEnabled = !capturing && !isTesting && !isLocalizationPreview
+        countLabel.stringValue = LF("已接收按键：%ld", sentCount)
         surface.needsDisplay = true
         writeState()
     }
@@ -397,7 +417,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         lastCapsLockState = NSEvent.modifierFlags.contains(.capsLock)
         capturing = true
         window.makeFirstResponder(surface)
-        appendLog("开始前台键盘输入；Esc 或窗口失焦时停止。")
+        appendLog(L("开始前台键盘输入；Esc 或窗口失焦时停止。"))
         updateUI()
     }
     func endCapture() {
@@ -405,7 +425,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         // Even an idle UI may still have a test or shortcut awaiting BLE capacity.
         if isConnected { transport.cancelPendingInput() }
         pressed.removeAll(); modifiers = 0; capturing = false
-        if wasCapturing { appendLog("已停止键盘输入，并释放按键。") }
+        if wasCapturing { appendLog(L("已停止键盘输入，并释放按键。")) }
         if window != nil { updateUI() }
     }
 
@@ -448,12 +468,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     @objc func sendTest() {
         guard isConnected, !capturing, !isTesting else { return }
         let alert = NSAlert()
-        alert.messageText = "将英文测试串输入到 iPhone"
-        alert.informativeText = "请先在 iPhone 的备忘录中点一下空白正文。此按钮会输入一行英文和数字，不会按回车。"
-        alert.addButton(withTitle: "发送测试串"); alert.addButton(withTitle: "取消")
+        alert.messageText = L("将英文测试串输入到 iPhone")
+        alert.informativeText = L("请先在 iPhone 的备忘录中点一下空白正文。此按钮会输入一行英文和数字，不会按回车。")
+        alert.addButton(withTitle: L("发送测试串")); alert.addButton(withTitle: L("取消"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let strokes = "mac keyboard test 123".compactMap(KeyMapping.asciiStroke)
-        appendLog("开始手动触发的英文测试；等待用户确认手机显示。")
+        appendLog(L("开始手动触发的英文测试；等待用户确认手机显示。"))
         isTesting = true
         testGeneration = UUID()
         updateUI()
@@ -464,7 +484,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         guard isConnected else { cancelTest(); updateUI(); return }
         guard index < strokes.count else {
             isTesting = false
-            appendLog("英文测试报告已交给发送队列；尚需确认 iPhone 是否实际显示文字。")
+            appendLog(L("英文测试报告已交给发送队列；尚需确认 iPhone 是否实际显示文字。"))
             updateUI(); return
         }
         let stroke = strokes[index]
@@ -489,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         endCapture()
         if transport.sendReport(modifiers: 0x01, keys: [0x2C]) {
             _ = transport.sendReport(modifiers: 0, keys: [])
-            appendLog("已接收手机输入法切换快捷键（Control + Space）。")
+            appendLog(L("已接收手机输入法切换快捷键（Control + Space）。"))
         }
     }
 
@@ -524,7 +544,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func windowWillClose(_ notification: Notification) { NSApp.terminate(nil) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
     func applicationWillTerminate(_ notification: Notification) {
-        cancelTest(); endCapture(); transport.stop(); isStarted = false; isConnected = false; status = "已退出"; writeState()
+        cancelTest(); endCapture(); transport.stop(); isStarted = false; isConnected = false; status = L("已退出"); writeState()
     }
 }
 

@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 project_dir="${0:A:h}"
-dmg_path="${1:-$project_dir/build/手机键盘-0.2.0-通用版.dmg}"
+dmg_path="${1:-$project_dir/build/手机键盘-0.3.0-通用版.dmg}"
 dmg_path="${dmg_path:a}"
 [[ "$dmg_path" == *.dmg ]] || { print -u2 "输出路径必须以 .dmg 结尾。"; exit 1; }
 
@@ -20,7 +20,7 @@ for target_arch in arm64 x86_64; do
 done
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_dir/Contents/Info.plist")"
 build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app_dir/Contents/Info.plist")"
-[[ "$version" == "0.2.0" && "$build_number" == "4" ]] || { print -u2 "App 版本应为 0.2.0 (4)，请重新构建。"; exit 1; }
+[[ "$version" == "0.3.0" && "$build_number" == "5" ]] || { print -u2 "App 版本应为 0.3.0 (5)，请重新构建。"; exit 1; }
 
 mkdir -p "$project_dir/build" "${dmg_path:h}"
 staging_dir="$(mktemp -d "$project_dir/build/.dmg-package.XXXXXX")"
