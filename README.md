@@ -12,7 +12,9 @@
 
 这是一个原生 macOS App，使用 Swift、AppKit 和 CoreBluetooth。默认常驻菜单栏，不占 Dock。左键点击菜单栏图标，或按全局快捷键 **Control + Option + K**，即可切换手机输入。默认显示简短的输入提示浮窗，也可在完整设置中关闭。按 **Esc**、再次按快捷键、点击图标或切换到其他窗口，都会停止输入并尝试释放按键。
 
-当前版本为 **0.5.0 (8)**。App 支持简体中文、繁体中文和英文，会根据 Mac 的首选语言自动选择界面；[完整英文指南](README.en.md)提供英文安装与连接说明。
+当前工程为 **0.6.0 (9) 可靠性候选版**，新增连接向导、App 内有界恢复与脱敏诊断。当前正常使用的 0.5.0 安装版保留；0.6.0 的蓝牙实测结果另行记录。App 支持简体中文、繁体中文和英文，会根据 Mac 的首选语言自动选择界面；[完整英文指南](README.en.md)提供英文安装与连接说明。
+
+本项目由当前用户一人试用，不以招募其他参与者为交付条件。参见[一人验收记录](docs/Single-User-Acceptance.md)、[商店发行准备](docs/AppStore-Readiness.md)和[隐私政策](docs/Privacy.zh-Hans.md)。商店沙盒候选构建与普通 DMG 分别验证；目前不能将候选包称为已通过 Apple 审核的商店版本。
 
 ## 界面语言
 
@@ -70,7 +72,7 @@ zsh build.sh
 
 ## 连接 iPhone
 
-1. 打开 Mac 上的“手机键盘”，找到“手机键盘”的菜单栏图标，等待蓝牙键盘服务启动。默认不会显示 Dock 图标或完整设置窗口。
+1. 打开 Mac 上的“手机键盘”。新用户按首次连接向导操作；已有用户可从菜单栏右键菜单打开“连接 iPhone…”。App 不占 Dock，完整设置可关闭。
 2. 在 iPhone 打开“设置 → 蓝牙”，选择这台 **Mac 的系统名称**，按系统提示完成配对。列表中的名称可能不是 App 名称。
 3. 在 iPhone 的备忘录等 App 中点一下文字输入位置，确认光标闪烁。
 4. 连接就绪后，左键点击 Mac 菜单栏图标，或按 **Control + Option + K**。等待图标变为实心后，再用 Mac 键盘打字。输入提示浮窗默认显示，可在完整设置中关闭。
@@ -91,6 +93,14 @@ zsh build.sh
 
 可以在完整设置中使用“发送英文测试串”检查手机是否实际显示文字。“已接收按键”包含本地等待发送的报告；计数增长不能代替手机画面的确认。
 
+### 0.6.0 连接与恢复
+
+连接向导分别展示本机蓝牙准备、手机端操作、实际键盘订阅和用户文字确认。系统配对窗口返回成功只说明系统配对完成；App 继续等待加密输入订阅，最后由用户确认手机上的短串。
+
+注册或广播失败、超时后，App 最多自动恢复两次本 App 的服务；没有手机订阅时不会反复重启。蓝牙状态改变后，旧回调与旧待发输入失效。向导也提供用户主动触发的一次服务恢复，不自动清除配对记录或修改系统蓝牙。
+
+“导出诊断报告”通过系统保存面板生成 JSON。它只保留版本、状态和事件摘要，不导出原始日志、设备名称、地址、标识或输入内容。报告不自动上传。
+
 ### 中文输入
 
 App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、选字。Mac 输入法已经组好的中文不会作为整段文字传过去。完整设置中的“切换手机输入法”按钮发送 `Control + Space`；切换后重新点击菜单栏图标或按全局快捷键开始输入。中文输入流程尚未完成实机验证。
@@ -105,17 +115,26 @@ App 发送硬件键盘按键，由 **iPhone 的硬件键盘输入法**组词、�
 zsh package.sh
 ```
 
-输出为 `build/手机键盘-0.5.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
+输出为 `build/手机键盘-0.6.0-通用版.dmg`。脚本检查 Universal 架构和 App 签名，并验证磁盘映像，不会自动上传或公证。
 
 安装盘同时附带中文、英文安装使用说明和 MIT 许可证，方便不同语言的用户安装与使用。
 
 也可以打包已经构建的 App，避免重复编译：
 
 ```sh
-zsh package.sh build/手机键盘-0.5.0-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.6.0-通用版.dmg build/手机键盘.app
 ```
 
-目前打包脚本对应 `0.5.0 (8)`。修改版本号时，需要同步调整 `Resources/Info.plist` 与打包脚本的版本检查。
+打包脚本按 `Resources/Info.plist` 检查 App 版本一致性。候选版的构建与校验不代替手机实测。
+
+### Mac App Store 沙盒构建
+
+```sh
+MACPHONEKEYS_BUILD_VARIANT=appstore zsh build.sh build/appstore/手机键盘.app
+zsh scripts/validate-appstore.sh build/appstore/手机键盘.app --candidate
+```
+
+这会创建启用 App Sandbox、Bluetooth 与用户选定文件权限的本地沙盒候选。默认 ad-hoc 或 Apple Development 签名不能提交商店。正式签名、配置描述文件、商店打包及审核资料参见[发行准备](docs/AppStore-Readiness.md)。不要沿用非沙盒版的蓝牙验证结论。
 
 ## BLE 实验范围
 
@@ -163,6 +182,10 @@ python3 scripts/make-localization-previews.py build/手机键盘.app
 | `Sources/GlobalHotKey.swift` | 全局输入切换快捷键与冲突处理 |
 | `Sources/KeyMapping.swift` | Mac 键码到 HID 键码的映射 |
 | `Sources/BLEKeyboard.swift` | BLE HID 服务与有界发送队列 |
+| `Sources/BLELifecycle.swift` | 服务发布代际、超时与有界恢复决策 |
+| `Sources/ConnectionAssistant.swift`、`Sources/PairingFlow.swift` | 系统配对入口、连接向导与人工验证边界 |
+| `Sources/DiagnosticReport.swift`、`Sources/DiagnosticReportExporter.swift` | 白名单诊断摘要与用户主动保存 |
+| `Sources/SingleInstanceCoordinator.swift` | 避免同一应用启动多份键盘服务 |
 | `Sources/BluetoothKeyboard.swift` | 传统蓝牙诊断后端 |
 | `Tests/` | 不连接设备的检查 |
 | `Tests/AppPreferencesTests.swift` | 使用隔离偏好套件检查默认值与跨实例持久化 |

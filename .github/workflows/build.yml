@@ -28,3 +28,10 @@ jobs:
         env:
           MACPHONEKEYS_SIGN_IDENTITY: "-"
         run: zsh build.sh
+      - name: Build sandbox candidate and verify entitlements
+        env:
+          MACPHONEKEYS_SIGN_IDENTITY: "-"
+          MACPHONEKEYS_BUILD_VARIANT: appstore
+        run: |
+          zsh build.sh build/appstore/手机键盘.app
+          zsh scripts/validate-appstore.sh build/appstore/手机键盘.app --candidate

@@ -109,3 +109,8 @@
 "连接超时；请确认 iPhone 蓝牙页面后重试" = "Connection timed out; check the iPhone's Bluetooth page and try again";
 "部分传入通道监听注册失败；仍可尝试主动连接已配对 iPhone。" = "Some incoming channel listeners could not be registered; an outgoing connection to a paired iPhone may still be tried.";
 "键盘服务未启动，无法发起连接；请按当前状态提示处理后重试。" = "The keyboard service has not started, so a connection cannot be initiated; follow the status message and try again.";
+"BLE 实验：已请求手动恢复本 App 蓝牙服务。" = "BLE test: Manual recovery of this app's Bluetooth service requested.";
+"BLE 实验：服务注册超时。" = "BLE test: Service registration timed out.";
+"BLE 实验：广播启动超时。" = "BLE test: Advertising startup timed out.";
+"BLE 实验：本 App 服务恢复尝试 %ld/%ld；不修改系统蓝牙或配对记录。" = "BLE test: Recovering this app's service (%ld/%ld); system Bluetooth and pairing records remain unchanged.";
+"BLE 实验：服务恢复次数已达上限；请查看连接诊断或手动恢复。" = "BLE test: Automatic recovery limit reached; open connection diagnostics or recover manually.";

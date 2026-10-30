@@ -16,6 +16,8 @@ struct BLEInputReportQueue {
     }
 
     var count: Int { reports.count }
+    var hasPendingRelease: Bool { releaseRequired }
+    var totalPendingCount: Int { reports.count + (releaseRequired ? 1 : 0) }
     var nextReport: Data? { releaseRequired ? Self.release : reports.first }
 
     @discardableResult
@@ -52,7 +54,22 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
 
     private let expandedServiceUUID: Bool
     private var manager: CBPeripheralManager?
-    private var running = false
+    private var lifecycle = BLELifecycle()
+    private var running: Bool { lifecycle.running }
+    private var managerGeneration = 0
+    private var deadline: DispatchWorkItem?
+    private var needsServiceCleanupOnPublish = true
+    private var managerServicesRetired = false
+    private var serviceCleanupCount = 0
+    private var enqueuedReportCount = 0
+    private var submittedReportCount = 0
+    private var releaseSubmissionCount = 0
+    private var cancelledQueuedReportCount = 0
+    private var overflowCount = 0
+    private var readTransactionCount = 0
+    private var writeTransactionCount = 0
+    private var subscriptionEventCount = 0
+    private var unsubscriptionEventCount = 0
     private var hidService: CBMutableService?
     private var mandatoryServices: [CBMutableService] = []
     private var registeredServices = Set<ObjectIdentifier>()
@@ -107,15 +124,44 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
         super.init()
     }
 
+    /// Aggregate evidence only. A submitted notification has no delivery/text
+    /// acknowledgement; no peer identifier, address or report contents escape.
+    var diagnosticSnapshot: [String: Any] {
+        precondition(Thread.isMainThread)
+        return [
+            "running": running, "phase": lifecycle.phase.rawValue,
+            "inputReady": inputReady,
+            "authorization": Self.authorizationDescription,
+            "radioState": manager.map { Self.radioState($0.state).rawValue } ?? "unknown",
+            "isAdvertising": manager?.isAdvertising ?? false,
+            "generation": lifecycle.generation,
+            "registeredServiceCount": lifecycle.registeredServiceCount,
+            "requiredServiceCount": lifecycle.requiredServiceCount,
+            "recoveryAttempt": lifecycle.recoveryAttempt,
+            "recoveryLimit": lifecycle.recoveryLimit,
+            "recoveryCount": lifecycle.recoveryCount,
+            "lastFailure": lifecycle.lastFailure?.rawValue ?? "",
+            "reportSubscriberCount": reportSubscribers.count,
+            "bootSubscriberCount": bootSubscribers.count,
+            "queueDepth": pendingInput.totalPendingCount,
+            "pendingRelease": pendingInput.hasPendingRelease,
+            "enqueuedReportCount": enqueuedReportCount,
+            "submittedReportCount": submittedReportCount,
+            "releaseSubmissionCount": releaseSubmissionCount,
+            "cancelledQueuedReportCount": cancelledQueuedReportCount,
+            "overflowCount": overflowCount, "serviceCleanupCount": serviceCleanupCount,
+            "readTransactionCount": readTransactionCount,
+            "writeTransactionCount": writeTransactionCount,
+            "subscriptionEventCount": subscriptionEventCount,
+            "unsubscriptionEventCount": unsubscriptionEventCount
+        ]
+    }
+
     func start() {
         precondition(Thread.isMainThread)
         guard !running else { return }
-        running = true
-        clearPublishedState()
         log(TL("BLE 实验开始：先验证标准 HID GATT 服务能否注册；尚未确认 iPhone 接受键盘。"))
-        state(false, TL("BLE 实验：正在初始化"))
-        manager = CBPeripheralManager(delegate: self, queue: .main,
-                                      options: [CBPeripheralManagerOptionShowPowerAlertKey: true])
+        execute(lifecycle.start())
     }
 
     func stop() {
@@ -124,17 +170,16 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
         // Clear unsent typing before the best-effort release. CoreBluetooth does
         // not expose delivery acknowledgement or cancellation of submitted data.
         cancelPendingInput()
-        running = false
-        if let manager {
-            manager.delegate = nil
-            if manager.state == .poweredOn {
-                manager.stopAdvertising()
-                manager.removeAllServices()
-            }
-        }
-        manager = nil
-        clearPublishedState()
-        state(false, TL("BLE 实验：已停止"))
+        execute(lifecycle.stop())
+    }
+
+    /// Explicit app-only recovery. This never changes system Bluetooth, bonds,
+    /// permissions or the iPhone. Waiting for a subscriber never calls it.
+    func recoverService() {
+        precondition(Thread.isMainThread)
+        log(TL("BLE 实验：已请求手动恢复本 App 蓝牙服务。"))
+        if isConnected { cancelPendingInput() }
+        execute(lifecycle.recover())
     }
 
     /// A peripheral cannot actively connect to a central by Classic address.
@@ -148,10 +193,11 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     @discardableResult
     func sendReport(modifiers: UInt8, keys: [UInt8]) -> Bool {
         precondition(Thread.isMainThread)
-        guard running, isConnected, !suspended, let manager,
+        guard running, isConnected, lifecycle.servicesReady, !suspended, let manager,
+              managerGeneration == lifecycle.generation,
               manager.state == .poweredOn, selectedInputCharacteristic != nil,
               selectedSubscriber != nil else {
-            pendingInput.cancel()
+            cancelQueuedReports()
             return false
         }
         var report = [UInt8](repeating: 0, count: 8)
@@ -163,11 +209,15 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
             for (index, usage) in unique.enumerated() { report[index + 2] = usage }
         }
         let data = Data(report)
+        let queuedBeforeEnqueue = pendingInput.count
         guard pendingInput.enqueue(data) else {
+            cancelledQueuedReportCount += queuedBeforeEnqueue
+            overflowCount += 1
             log(TL("BLE 实验：待发报告超过有界队列上限；已取消待发输入，仅保留释放，停止本次输入。"))
             flushPendingInput()
             return false
         }
+        enqueuedReportCount += 1
         flushPendingInput()
         // Accepted by this bounded transport FIFO. This is not a delivery ack.
         return true
@@ -178,12 +228,13 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     /// instead, preserving the press/release sequence already queued.
     func cancelPendingInput() {
         precondition(Thread.isMainThread)
-        pendingInput.cancel()
+        cancelQueuedReports()
         flushPendingInput()
     }
 
     private func flushPendingInput() {
-        guard !flushingInput, running, isConnected, !suspended, let manager,
+        guard !flushingInput, running, isConnected, lifecycle.servicesReady, !suspended, let manager,
+              managerGeneration == lifecycle.generation,
               manager.state == .poweredOn, let characteristic = selectedInputCharacteristic,
               let central = selectedSubscriber else { return }
         flushingInput = true
@@ -197,6 +248,8 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
                 return
             }
             lastInputReport = report
+            submittedReportCount += 1
+            if report.allSatisfy({ $0 == 0 }) { releaseSubmissionCount += 1 }
             pendingInput.didSubmitNext()
         }
         if observedBackpressure {
@@ -208,23 +261,173 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
         precondition(Thread.isMainThread)
         guard peripheral === manager, running else { return }
-        switch peripheral.state {
-        case .poweredOn:
-            if hidService == nil { publishHIDService(peripheral) }
-        case .poweredOff:
-            clearPublishedState()
-            state(false, TL("BLE 实验：蓝牙已关闭"))
-        case .unauthorized:
-            clearPublishedState()
-            state(false, TL("BLE 实验：蓝牙权限未允许"))
-        case .unsupported:
-            clearPublishedState()
-            state(false, TL("BLE 实验：系统不支持 BLE peripheral"))
-        case .resetting:
-            clearPublishedState()
-            state(false, TL("BLE 实验：系统蓝牙正在重置"))
-        default:
-            state(false, TL("BLE 实验：等待系统蓝牙状态"))
+        execute(lifecycle.radioChanged(Self.radioState(peripheral.state)))
+    }
+
+    private static func radioState(_ state: CBManagerState) -> BLELifecycle.RadioState {
+        switch state {
+        case .poweredOn: return .poweredOn
+        case .poweredOff: return .poweredOff
+        case .resetting: return .resetting
+        case .unsupported: return .unsupported
+        case .unauthorized: return .unauthorized
+        default: return .unknown
+        }
+    }
+
+    private func isCurrentPublication(_ peripheral: CBPeripheralManager) -> Bool {
+        peripheral === manager && peripheral.state == .poweredOn
+            && lifecycle.acceptsCurrentPublication(managerGeneration)
+    }
+
+    private static var authorizationDescription: String {
+        switch CBManager.authorization {
+        case .allowedAlways: return "allowedAlways"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        case .notDetermined: return "notDetermined"
+        @unknown default: return "unknown"
+        }
+    }
+
+    private var inputReady: Bool {
+        running && lifecycle.servicesReady && serviceRegistrationSucceeded
+            && manager?.state == .poweredOn && managerGeneration == lifecycle.generation
+            && selectedSubscriber != nil && !suspended
+    }
+
+    private func cancelQueuedReports() {
+        cancelledQueuedReportCount += pendingInput.count
+        pendingInput.cancel()
+    }
+
+    private func discardManager() {
+        let previous = manager
+        manager = nil
+        managerGeneration = 0
+        previous?.delegate = nil
+        needsServiceCleanupOnPublish = true
+        if let previous, previous.state == .poweredOn {
+            previous.stopAdvertising()
+            if !managerServicesRetired {
+                previous.removeAllServices() // Only services owned by this app.
+                serviceCleanupCount += 1
+            }
+            needsServiceCleanupOnPublish = false
+        }
+        managerServicesRetired = false
+    }
+
+    private func execute(_ actions: [BLELifecycle.Action]) {
+        for action in actions {
+            switch action {
+            case .cancelDeadline:
+                deadline?.cancel()
+                deadline = nil
+            case .resetInput:
+                resetInputState()
+            case .clearPublishedObjects:
+                clearPublishedState()
+            case .retirePublication:
+                if let manager, manager.state == .poweredOn {
+                    manager.stopAdvertising()
+                    if !managerServicesRetired {
+                        manager.removeAllServices()
+                        serviceCleanupCount += 1
+                        managerServicesRetired = true
+                    }
+                }
+            case .discardManager:
+                discardManager()
+            case .replaceManager(let generation):
+                // Replacing the manager also gives tokenless advertising
+                // callbacks a distinct identity. Retire the old delegate first.
+                discardManager()
+                managerGeneration = generation
+                manager = CBPeripheralManager(delegate: self, queue: .main,
+                    options: [CBPeripheralManagerOptionShowPowerAlertKey: true])
+            case .publish(let generation):
+                guard let manager, managerGeneration == generation,
+                      isCurrentPublication(manager) else { continue }
+                if needsServiceCleanupOnPublish {
+                    manager.stopAdvertising()
+                    manager.removeAllServices()
+                    serviceCleanupCount += 1
+                    needsServiceCleanupOnPublish = false
+                }
+                managerServicesRetired = false
+                publishHIDService(manager)
+            case .advertise(let generation):
+                guard let manager, managerGeneration == generation,
+                      isCurrentPublication(manager), lifecycle.servicesReady else { continue }
+                serviceRegistrationSucceeded = true
+                log(TL("BLE 实验：三项必需 GATT 服务均注册成功；不代表 iPhone 已识别或接受键盘。"))
+                log(TL("BLE 实验：广告使用短 HID UUID 1812 和短名称 MacKeys；GATT 服务保留本次注册的 UUID 表达。"))
+                if manager.isAdvertising {
+                    execute(lifecycle.didStartAdvertising(generation: generation, succeeded: true, isAdvertising: true))
+                } else {
+                    manager.startAdvertising([CBAdvertisementDataLocalNameKey: hostName,
+                        CBAdvertisementDataServiceUUIDsKey: [CBUUID(string: "1812")]])
+                }
+            case .registrationDeadline(let generation):
+                guard lifecycle.generation == generation, lifecycle.phase == .registering else { continue }
+                scheduleDeadline(after: 8) { [weak self] in
+                    guard let self, self.lifecycle.generation == generation,
+                          self.lifecycle.phase == .registering else { return }
+                    self.log(TL("BLE 实验：服务注册超时。"))
+                    self.execute(self.lifecycle.registrationTimedOut(generation: generation))
+                }
+            case .advertisingDeadline(let generation):
+                guard lifecycle.generation == generation, lifecycle.phase == .advertising else { continue }
+                scheduleDeadline(after: 8) { [weak self] in
+                    guard let self, self.lifecycle.generation == generation,
+                          self.lifecycle.phase == .advertising else { return }
+                    let advertising = self.manager?.isAdvertising == true
+                    if !advertising { self.log(TL("BLE 实验：广播启动超时。")) }
+                    self.execute(self.lifecycle.advertisingTimedOut(generation: generation, isAdvertising: advertising))
+                }
+            case .retryDeadline(let generation, let delay):
+                log(TLF("BLE 实验：本 App 服务恢复尝试 %ld/%ld；不修改系统蓝牙或配对记录。",
+                        lifecycle.recoveryAttempt, lifecycle.recoveryLimit))
+                scheduleDeadline(after: delay) { [weak self] in
+                    guard let self, self.lifecycle.generation == generation,
+                          self.lifecycle.phase == .recovering else { return }
+                    self.execute(self.lifecycle.retryDue(generation: generation))
+                }
+            }
+        }
+        serviceRegistrationSucceeded = lifecycle.servicesReady
+        if lifecycle.phase == .advertising, selectedSubscriber != nil {
+            execute(lifecycle.didSubscribe(generation: managerGeneration))
+            return
+        }
+        refreshLifecycleState()
+    }
+
+    private func scheduleDeadline(after delay: TimeInterval, work: @escaping () -> Void) {
+        deadline?.cancel()
+        let item = DispatchWorkItem(block: work)
+        deadline = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private func refreshLifecycleState() {
+        switch lifecycle.phase {
+        case .stopped: state(false, TL("BLE 实验：已停止"))
+        case .waitingForRadio:
+            switch manager.map({ Self.radioState($0.state) }) ?? lifecycle.radioState {
+            case .poweredOff: state(false, TL("BLE 实验：蓝牙已关闭"))
+            case .unauthorized: state(false, TL("BLE 实验：蓝牙权限未允许"))
+            case .unsupported: state(false, TL("BLE 实验：系统不支持 BLE peripheral"))
+            case .resetting: state(false, TL("BLE 实验：系统蓝牙正在重置"))
+            default: state(false, TL("BLE 实验：正在初始化"))
+            }
+        case .registering, .recovering: state(false, TL("BLE 实验：正在初始化"))
+        case .advertising: state(false, TL("BLE 实验：服务已注册，正在广播"))
+        case .ready:
+            if selectedSubscriber != nil { updateConnectionState() }
+            else { state(false, TL("BLE 实验：等待 iPhone 订阅键盘")) }
+        case .failed: state(false, TL("BLE 实验：服务恢复次数已达上限；请查看连接诊断或手动恢复。"))
         }
     }
 
@@ -287,42 +490,35 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
-        guard peripheral === manager, running,
-              let required = mandatoryServices.first(where: { $0 === service }) else { return }
+        guard isCurrentPublication(peripheral), lifecycle.phase == .registering,
+              let index = mandatoryServices.firstIndex(where: { $0 === service }) else { return }
+        let required = mandatoryServices[index]
         let identifier = ObjectIdentifier(required)
         if let error {
             failedServices.insert(identifier)
-            serviceRegistrationSucceeded = false
             log(TLF("BLE 实验：服务 %@ 注册被系统拒绝：%@", service.uuid.uuidString, describe(error)))
-            state(false, TL("BLE 实验：必需服务注册失败，不启动广播"))
-            return
+        } else {
+            guard registeredServices.insert(identifier).inserted else { return }
+            log(TLF("BLE 实验：服务 %@ 注册回调成功（%ld/%ld）。", service.uuid.uuidString, registeredServices.count, mandatoryServices.count))
         }
-        registeredServices.insert(identifier)
-        log(TLF("BLE 实验：服务 %@ 注册回调成功（%ld/%ld）。", service.uuid.uuidString, registeredServices.count, mandatoryServices.count))
-        guard failedServices.isEmpty, registeredServices.count == mandatoryServices.count,
-              !serviceRegistrationSucceeded else { return }
-        serviceRegistrationSucceeded = true
-        log(TL("BLE 实验：三项必需 GATT 服务均注册成功；不代表 iPhone 已识别或接受键盘。"))
-        log(TL("BLE 实验：广告使用短 HID UUID 1812 和短名称 MacKeys；GATT 服务保留本次注册的 UUID 表达。"))
-        state(false, TL("BLE 实验：服务已注册，正在广播"))
-        peripheral.startAdvertising([CBAdvertisementDataLocalNameKey: hostName,
-                                     CBAdvertisementDataServiceUUIDsKey: [CBUUID(string: "1812")]])
+        execute(lifecycle.didAddService(index, generation: managerGeneration, succeeded: error == nil))
     }
 
     func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
-        guard peripheral === manager, running, serviceRegistrationSucceeded else { return }
+        guard isCurrentPublication(peripheral), lifecycle.phase == .advertising else { return }
         if let error {
             log(TLF("BLE 实验：广播启动失败：%@", describe(error)))
-            state(false, TL("BLE 实验：广播失败"))
         } else {
             log(TL("BLE 实验：广播启动回调成功，等待 iPhone 加密订阅输入报告；尚未确认手机输入。"))
-            if !isConnected { state(false, TL("BLE 实验：等待 iPhone 订阅键盘")) }
         }
+        execute(lifecycle.didStartAdvertising(generation: managerGeneration,
+            succeeded: error == nil, isAdvertising: peripheral.isAdvertising))
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
                            didSubscribeTo characteristic: CBCharacteristic) {
-        guard peripheral === manager, running else { return }
+        guard isCurrentPublication(peripheral) else { return }
+        subscriptionEventCount += 1
         if characteristic === batteryLevel {
             log(TL("BLE 实验：主机订阅 Battery 通知；此项不视为键盘连接。"))
             if let batteryLevel {
@@ -334,7 +530,7 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
         else if characteristic === bootInputReport { bootSubscribers[central.identifier] = central }
         else { return }
         if selectedCentralID == nil {
-            pendingInput.cancel()
+            cancelQueuedReports()
             selectedCentralID = central.identifier
         }
         guard selectedCentralID == central.identifier else {
@@ -343,22 +539,24 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
         }
         log(TLF("BLE 实验：收到加密输入通知订阅（%@）；仍需查看 iPhone 实际文字。", characteristic.uuid.uuidString))
         let wasConnected = isConnected
+        execute(lifecycle.didSubscribe(generation: managerGeneration))
         updateConnectionState()
         if isConnected && !wasConnected { cancelPendingInput() }
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral,
                            didUnsubscribeFrom characteristic: CBCharacteristic) {
-        guard peripheral === manager, running else { return }
+        guard isCurrentPublication(peripheral) else { return }
+        unsubscriptionEventCount += 1
         let affectsCurrentInput = selectedCentralID == central.identifier && characteristic === selectedInputCharacteristic
-        if affectsCurrentInput { pendingInput.cancel() }
+        if affectsCurrentInput { cancelQueuedReports() }
         if characteristic === inputReport { reportSubscribers.removeValue(forKey: central.identifier) }
         else if characteristic === bootInputReport { bootSubscribers.removeValue(forKey: central.identifier) }
         else { return }
         if selectedCentralID == central.identifier,
            reportSubscribers[central.identifier] == nil, bootSubscribers[central.identifier] == nil {
             selectedCentralID = nil
-            pendingInput.cancel()
+            cancelQueuedReports()
             observedBackpressure = false
             protocolMode = 1
             suspended = false
@@ -368,7 +566,9 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveRead request: CBATTRequest) {
-        guard peripheral === manager, running else { return }
+        guard isCurrentPublication(peripheral) else { return }
+        readTransactionCount += 1
+        execute(lifecycle.didReceiveATT(generation: managerGeneration))
         logFirstTransaction("读", characteristic: request.characteristic)
         let data: Data
         if request.characteristic === batteryLevel { data = Data([100]) }
@@ -388,7 +588,9 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didReceiveWrite requests: [CBATTRequest]) {
-        guard peripheral === manager, running, let first = requests.first else { return }
+        guard isCurrentPublication(peripheral), let first = requests.first else { return }
+        writeTransactionCount += requests.count
+        execute(lifecycle.didReceiveATT(generation: managerGeneration))
         for request in requests { logFirstTransaction("写", characteristic: request.characteristic) }
         // Validate the complete batch before changing state. Respond once, using
         // the first request, as required by the CoreBluetooth batch-write API.
@@ -414,7 +616,7 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
                 if protocolMode != value {
                     cancelPendingInput()
                     state(false, TL("BLE 实验：主机切换协议，已停止当前输入"))
-                    pendingInput.cancel()
+                    cancelQueuedReports()
                     observedBackpressure = false
                 }
                 protocolMode = value
@@ -435,7 +637,7 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     }
 
     func peripheralManagerIsReady(toUpdateSubscribers peripheral: CBPeripheralManager) {
-        guard peripheral === manager, running else { return }
+        guard isCurrentPublication(peripheral) else { return }
         flushPendingInput()
     }
 
@@ -449,9 +651,9 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
     }
 
     private func updateConnectionState() {
-        let connected = running && serviceRegistrationSucceeded && selectedSubscriber != nil && !suspended
+        let connected = inputReady
         if !connected {
-            pendingInput.cancel()
+            cancelQueuedReports()
             observedBackpressure = false
         }
         if connected {
@@ -469,7 +671,7 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
         reportSubscribers.removeAll()
         bootSubscribers.removeAll()
         selectedCentralID = nil
-        pendingInput.cancel()
+        cancelQueuedReports()
         observedBackpressure = false
     }
 
@@ -481,9 +683,16 @@ final class BLEKeyboard: NSObject, CBPeripheralManagerDelegate {
         failedServices.removeAll()
         batteryLevel = nil
         pnpID = nil
+        reportMap = nil
+        hidInformation = nil
+        protocolModeCharacteristic = nil
+        controlPoint = nil
+        inputReport = nil
+        outputReport = nil
+        bootInputReport = nil
+        bootOutputReport = nil
         loggedReadUUIDs.removeAll()
         loggedWriteUUIDs.removeAll()
-        resetInputState()
     }
 
     private func logFirstTransaction(_ operation: String, characteristic: CBCharacteristic) {

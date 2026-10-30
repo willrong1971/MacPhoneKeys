@@ -10,7 +10,9 @@ MacPhoneKeys stays in the **menu bar**, without a Dock icon. Left-click its icon
 
 Author: **九福爸爸 9fbaba**.
 
-Version **0.5.0 (8)** supports English, Simplified Chinese and Traditional Chinese. The app selects its interface language from the Mac's preferred supported languages, with English as the fallback. Its English name is **MacPhoneKeys**; its Chinese name is **手机键盘**.
+Version **0.6.0 (9)** is a reliability candidate with a connection assistant, bounded app-service recovery and allowlisted diagnostic exports. The installed working 0.5.0 build is retained; its phone-side results do not validate 0.6.0 or a sandbox build. English, Simplified Chinese and Traditional Chinese follow the Mac's preferred supported languages, with English as the fallback.
+
+Acceptance is performed by the current user alone; recruiting other testers is not a delivery requirement. See the [single-user acceptance plan](docs/Single-User-Acceptance.md), [App Store preparation](docs/AppStore-Readiness.md) and [privacy policy](docs/Privacy.en.md). A local sandbox candidate is not an approved App Store release.
 
 ## Interface language
 
@@ -148,19 +150,36 @@ To rebuild the app and make a disk image:
 zsh package.sh
 ```
 
-The default output is `build/手机键盘-0.5.0-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
+The default output is `build/手机键盘-0.6.0-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
 
 The disk image includes Chinese and English installation/usage instructions and the MIT license file, `LICENSE`.
 
 To package an existing app without rebuilding it:
 
 ```sh
-zsh package.sh build/手机键盘-0.5.0-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.6.0-通用版.dmg build/手机键盘.app
 ```
 
 Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eject the disk image after installation. If a release provides a prebuilt DMG, check that release's signing and notarization information before opening the app.
 
-The packaging script currently expects version **0.5.0 (8)**. Update the version check in the script and `Resources/Info.plist` together when changing that version.
+The packaging script checks that the app matches the version in `Resources/Info.plist`.
+
+### Connection assistant and recovery in 0.6.0
+
+Open **Connect iPhone…** from the menu bar menu. New users see the assistant on first launch. It distinguishes Mac Bluetooth preparation, the phone's setup steps, actual encrypted keyboard subscription and user-confirmed text. A successful system pairing panel is not treated as keyboard readiness or visible text delivery.
+
+Service-registration and advertising errors or timeouts allow at most two automatic app-service recovery attempts. Waiting for a phone never causes a restart loop. A user can request one explicit service recovery from the assistant. It does not change global Bluetooth or forget devices.
+
+**Export Diagnostics** uses the system save panel. Reports contain versions, state and fixed event summaries, not raw logs, device names, addresses, identifiers or typed text. They are not uploaded.
+
+### Local Mac App Store sandbox candidate
+
+```sh
+MACPHONEKEYS_BUILD_VARIANT=appstore zsh build.sh build/appstore/手机键盘.app
+zsh scripts/validate-appstore.sh build/appstore/手机键盘.app --candidate
+```
+
+This builds a local sandbox candidate with Bluetooth and user-selected-file access. The default ad-hoc or Apple Development signature is not suitable for App Store submission. Matching distribution configuration, signing, packaging and review material are described in [App Store preparation](docs/AppStore-Readiness.md). Phone validation must be repeated inside the sandbox.
 
 ## Troubleshooting
 

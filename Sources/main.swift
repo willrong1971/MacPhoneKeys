@@ -106,7 +106,8 @@ private final class PreviewKeyboardTransport: KeyboardTransport {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCentralManagerDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCentralManagerDelegate, ConnectionAssistantDelegate {
+    var isAppStoreBuild: Bool { Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysBuildVariant") as? String == "appstore" }
     // UI validation uses an isolated bundle with this flag. It never starts a
     // Bluetooth manager or writes to the installed app's runtime directory.
     let isLocalizationPreview = Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysLocalizationPreview") as? Bool == true
@@ -116,6 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var window: NSWindow!
     var menuBar: MenuBarController!
     var preferences = AppPreferences()
+    var connectionAssistant: ConnectionAssistant?
+    var pairingFlow = PairingFlow()
+    var assistantTestAttemptID: UUID?
     var inputHintCheckbox: NSButton!
     var globalHotKey: GlobalHotKey?
     weak var captureSurface: KeyboardSurface?
@@ -164,6 +168,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var stateURL: URL { rootURL.appendingPathComponent("连接状态.json") }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let priorLogSize = (try? FileManager.default.attributesOfItem(atPath: logURL.path)[.size] as? NSNumber)?.intValue ?? 0
+        let shouldShowFirstConnection = !isLocalizationPreview && ConnectionAssistantOnboarding.shouldPresent(hasExistingUse: priorLogSize > 0)
         try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         buildUI()
         if isLocalizationPreview { transport = PreviewKeyboardTransport() }
@@ -198,7 +204,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
             isConnected = true
         }
         updateUI()
-        if isLocalizationPreview || CommandLine.arguments.contains("--show-settings") { showSettings() }
+        let showAssistantPreview = isLocalizationPreview && (CommandLine.arguments.contains("--show-assistant")
+            || Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysPreviewShowAssistant") as? Bool == true)
+        if showAssistantPreview || shouldShowFirstConnection && !CommandLine.arguments.contains("--show-settings") {
+            showConnectionAssistant()
+        } else if isLocalizationPreview || CommandLine.arguments.contains("--show-settings") { showSettings() }
         if !isLocalizationPreview {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.startService() }
         }
@@ -274,7 +284,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         bluetooth.isEnabled = !isLocalizationPreview
         pairButton = button(L("查找／配对 iPhone"), #selector(pairPhone))
         modeButton = button(L("低功耗蓝牙测试"), #selector(nextTransport))
-        let topButtons = NSStackView(views: [startButton, bluetooth, pairButton, modeButton]); topButtons.spacing = 8
+        let assistantButton = button(L("连接 iPhone…"), #selector(showConnectionAssistant))
+        let topButtons = NSStackView(views: [assistantButton, startButton, bluetooth, pairButton, modeButton]); topButtons.spacing = 8
         stack.addArrangedSubview(topButtons)
 
         instructionsLabel = label("")
@@ -327,6 +338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         let appMenu = NSMenuItem(); menu.addItem(appMenu)
         let submenu = NSMenu(title: L("手机键盘")); appMenu.submenu = submenu
         submenu.addItem(withTitle: L("关于手机键盘"), action: #selector(showAbout), keyEquivalent: "")
+        submenu.addItem(withTitle: L("连接 iPhone…"), action: #selector(showConnectionAssistant), keyEquivalent: "")
         submenu.addItem(withTitle: L("完整设置…"), action: #selector(showSettings), keyEquivalent: ",")
         submenu.addItem(.separator())
         submenu.addItem(withTitle: L("隐藏手机键盘"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -373,6 +385,89 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         window.makeKeyAndOrderFront(nil)
     }
 
+    @objc func showConnectionAssistant() {
+        cancelTest(); endCapture()
+        if !isLocalizationPreview { ConnectionAssistantOnboarding.markSeen() }
+        if connectionAssistant == nil { connectionAssistant = ConnectionAssistant(delegate: self) }
+        refreshConnectionAssistant()
+        connectionAssistant?.present()
+    }
+
+    func currentBLEDiagnosticSnapshot() -> [String: Any] {
+        if isLocalizationPreview {
+            return ["running": true, "authorization": "allowedAlways", "radioState": "poweredOn",
+                    "phase": "ready", "isAdvertising": true, "registeredServiceCount": 3,
+                    "requiredServiceCount": 3, "reportSubscriberCount": 1, "bootSubscriberCount": 0,
+                    "inputReady": true, "recoveryAttempt": 0, "recoveryLimit": 2,
+                    "generation": "offline-preview"]
+        }
+        var snapshot = (transport as? BLEKeyboard)?.diagnosticSnapshot ?? [:]
+        switch CBManager.authorization {
+        case .allowedAlways: snapshot["authorization"] = "allowedAlways"
+        case .denied: snapshot["authorization"] = "denied"
+        case .restricted: snapshot["authorization"] = "restricted"
+        case .notDetermined: snapshot["authorization"] = "notDetermined"
+        @unknown default: snapshot["authorization"] = "unknown"
+        }
+        // Use the transport's live generation/protocol/radio gate. A cached UI
+        // connection flag may lag behind a disconnect callback.
+        if snapshot["inputReady"] == nil { snapshot["inputReady"] = false }
+        return snapshot
+    }
+
+    func refreshConnectionAssistant() {
+        pairingFlow.observe(PairingFlow.Observation(snapshot: currentBLEDiagnosticSnapshot(), isPreview: isLocalizationPreview))
+        let name = isLocalizationPreview ? L("这台 Mac") : Host.current().localizedName ?? L("这台 Mac")
+        connectionAssistant?.render(flow: pairingFlow, macName: name)
+    }
+
+    func connectionAssistantNeedsRefresh() { refreshConnectionAssistant() }
+    func connectionAssistantStartService() { startService(); refreshConnectionAssistant() }
+    func connectionAssistantOpenBluetoothSettings() { guard !isLocalizationPreview else { return }; openBluetoothSettings() }
+    func connectionAssistantWillOpenSystemPairing() {
+        cancelTest(); endCapture()
+        pairingFlow.systemPanelDidOpen()
+        appendLog(L("用户打开系统配对窗口；等待系统结果和键盘订阅。"))
+        updateUI()
+    }
+    func connectionAssistantDidFinishSystemPairing(_ result: PairingFlow.SystemPanelResult) {
+        pairingFlow.systemPanelDidFinish(result)
+        switch result {
+        case .selectionPaired: appendLog(L("系统配对面板返回成功；不代表键盘订阅或手机文字验证成功。"))
+        case .cancelled: appendLog(L("用户取消系统配对；未清除配对记录或重建键盘服务。"))
+        default: appendLog(L("系统配对面板未完成；等待用户检查两端系统提示。"))
+        }
+        updateUI()
+    }
+    func connectionAssistantRecoverService() {
+        refreshConnectionAssistant()
+        guard pairingFlow.canRecoverService, let ble = transport as? BLEKeyboard else { return }
+        cancelTest(); endCapture()
+        pairingFlow.serviceRecoveryRequested()
+        appendLog(L("用户请求重建一次本 App 的键盘服务。"))
+        ble.recoverService()
+        updateUI()
+    }
+    func connectionAssistantSendTest() {
+        refreshConnectionAssistant()
+        guard pairingFlow.canSendTest else { return }
+        performEnglishTest(fromAssistant: true)
+    }
+    func connectionAssistantReportPhoneText(visible: Bool) {
+        refreshConnectionAssistant()
+        guard pairingFlow.recordPhoneTextVisible(visible) else { return }
+        appendLog(visible ? L("用户确认手机完整显示了测试文字；这是人工观察结果。")
+            : L("用户反馈手机未完整显示测试文字；尚未通过人工验证。"))
+        updateUI()
+    }
+    func connectionAssistantExportDiagnostics() {
+        cancelTest(); endCapture(); refreshConnectionAssistant()
+        DiagnosticReportExporter.export(snapshot: diagnosticStateSnapshot(), logLines: lines,
+                                        presentationWindow: connectionAssistant?.window ?? window)
+    }
+    func connectionAssistantShowFullSettings() { connectionAssistant?.close(); showSettings() }
+    func connectionAssistantDidClose() { cancelTest(); writeState() }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings()
         return false
@@ -414,7 +509,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     @objc func nextTransport() {
-        guard !isLocalizationPreview else { return }
+        guard !isLocalizationPreview, !isAppStoreBuild else { return }
         cancelTest(); endCapture()
         transport.stop()
         transport.onLog = nil; transport.onStateChange = nil
@@ -429,7 +524,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     @objc func pairPhone() {
-        guard !isLocalizationPreview else { return }
+        guard !isLocalizationPreview, !isAppStoreBuild else { return }
         guard transportMode == 0 else { return }
         cancelTest(); endCapture()
         if !isStarted { startService() }
@@ -498,7 +593,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         modeButton.isEnabled = !isLocalizationPreview
         pairButton.isEnabled = transportMode == 0 && !isLocalizationPreview
         pairButton.isHidden = transportMode != 0
-        modeButton.isHidden = !CommandLine.arguments.contains("--diagnostics")
+        modeButton.isHidden = isAppStoreBuild || !CommandLine.arguments.contains("--diagnostics")
         deviceRow.isHidden = transportMode != 0
         if transportMode == 0 {
             instructionsLabel.stringValue = L("① iPhone：设置 → 蓝牙，保持这个页面打开。\n② 在其他设备中选择这台 Mac，并核对系统显示的配对码。\n③ 若已配对，在下面选择 iPhone，点“连接所选手机”。")
@@ -516,6 +611,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         countLabel.stringValue = LF("已接收按键：%ld", sentCount)
         surface.needsDisplay = true
         menuBar?.update()
+        refreshConnectionAssistant()
         writeState()
     }
 
@@ -531,8 +627,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     func toggleMenuBarCapture(fromHotKey: Bool = false) {
+        guard !pairingFlow.systemPanelOpen, NSApp.modalWindow == nil,
+              window?.attachedSheet == nil, connectionAssistant?.window?.attachedSheet == nil else { return }
         if capturing || captureActivation.pending != nil { endCapture(restoreFocus: true); return }
-        guard isConnected, !isTesting else { showSettings(); return }
+        guard isConnected, !isTesting else { showConnectionAssistant(); return }
         let request = captureActivation.begin(fromHotKey: fromHotKey)
         menuBar.showCapturePanel()
         advanceCaptureActivation()
@@ -656,12 +754,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     @objc func sendTest() {
-        guard isConnected, !capturing, !isTesting, captureActivation.pending == nil else { return }
+        performEnglishTest(fromAssistant: false)
+    }
+    func performEnglishTest(fromAssistant: Bool) {
+        guard isConnected, !capturing, !isTesting, captureActivation.pending == nil, !pairingFlow.systemPanelOpen else { return }
         let alert = NSAlert()
         alert.messageText = L("将英文测试串输入到 iPhone")
         alert.informativeText = L("请先在 iPhone 的备忘录中点一下空白正文。此按钮会输入一行英文和数字，不会按回车。")
         alert.addButton(withTitle: L("发送测试串")); alert.addButton(withTitle: L("取消"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
+        if fromAssistant {
+            refreshConnectionAssistant()
+            guard let attempt = pairingFlow.beginTest() else { return }
+            assistantTestAttemptID = attempt
+        }
         let strokes = "mac keyboard test 123".compactMap(KeyMapping.asciiStroke)
         appendLog(L("开始手动触发的英文测试；等待用户确认手机显示。"))
         isTesting = true
@@ -674,6 +780,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         guard isConnected else { cancelTest(); updateUI(); return }
         guard index < strokes.count else {
             isTesting = false
+            if let attempt = assistantTestAttemptID {
+                _ = pairingFlow.finishedSendingTest(attempt)
+                assistantTestAttemptID = nil
+            }
             appendLog(L("英文测试报告已交给发送队列；尚需确认 iPhone 是否实际显示文字。"))
             updateUI(); return
         }
@@ -690,6 +800,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
 
     func cancelTest() {
         if isTesting && isConnected { transport.cancelPendingInput() }
+        if let attempt = assistantTestAttemptID {
+            pairingFlow.cancelTest(attempt)
+            assistantTestAttemptID = nil
+        }
         isTesting = false
         testGeneration = UUID()
     }
@@ -704,7 +818,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 
     func appendLog(_ message: String) {
-        let formatter = DateFormatter(); formatter.dateFormat = "HH:mm:ss"
+        let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZZ"
         let line = "[\(formatter.string(from: Date()))] \(message)"
         lines.append(line)
         if lines.count > 300 { lines.removeFirst(lines.count - 300) }
@@ -718,7 +833,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         writeState()
     }
 
-    func writeState() {
+    func diagnosticStateSnapshot() -> [String: Any] {
+        let bleSnapshot = currentBLEDiagnosticSnapshot()
+        pairingFlow.observe(PairingFlow.Observation(snapshot: bleSnapshot, isPreview: isLocalizationPreview))
         var state: [String: Any] = ["started": isStarted, "connected": isConnected, "capturing": capturing,
                                   "acceptedKeyPresses": sentCount, "status": status,
                                   "phoneTextVerifiedByApp": false, "transportMode": transportMode,
@@ -732,6 +849,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                   "hintWindowVisible": preferences.showsInputHint && (menuBar?.panel.isVisible ?? false),
                                   "inputPanelWidth": Double(menuBar?.panel.frame.width ?? 0),
                                   "inputPanelHeight": Double(menuBar?.panel.frame.height ?? 0),
+                                  "connectionAssistantVisible": connectionAssistant?.window?.isVisible ?? false,
+                                  "phoneTextVerifiedByUser": pairingFlow.verificationState == .visibleByUser,
+                                  "pairingAssistant": pairingFlow.diagnosticSnapshot,
+                                  "ble": bleSnapshot,
+                                  "runningInstanceCount": SingleInstanceCoordinator.runningInstanceCount,
                                   "updatedAt": ISO8601DateFormatter().string(from: Date())]
         if let preview = transport as? PreviewKeyboardTransport {
             // Aggregate fixture diagnostics only; never save characters or key codes.
@@ -741,6 +863,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                 "panelVisible": menuBar?.panel.isVisible ?? false,
                                 "panelIsKey": menuBar?.panel.isKeyWindow ?? false]
         }
+        return state
+    }
+
+    func writeState() {
+        let state = diagnosticStateSnapshot()
         if let data = try? JSONSerialization.data(withJSONObject: state, options: [.prettyPrinted, .sortedKeys]) {
             try? data.write(to: stateURL, options: .atomic)
         }
@@ -780,8 +907,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     }
 }
 
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
-let delegate = AppDelegate()
-app.delegate = delegate
-app.run()
+if !SingleInstanceCoordinator.focusExistingInstanceIfNeeded() {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.accessory)
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.run()
+}

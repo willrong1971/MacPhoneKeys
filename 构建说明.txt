@@ -1,4 +1,4 @@
-手机键盘 / MacPhoneKeys 0.5.0 (8) 源码
+手机键盘 / MacPhoneKeys 0.6.0 (9) 可靠性候选源码
 
 需要完整 Xcode 或支持本项目 API 的 Xcode 命令行工具。
 
@@ -25,12 +25,20 @@
 
 制作带 Applications 快捷方式的 DMG：
   zsh package.sh
-默认输出为 build/手机键盘-0.5.0-通用版.dmg。
+默认输出为 build/手机键盘-0.6.0-通用版.dmg。
 
 也可以为已有 App 打包：
-  zsh package.sh /绝对路径/手机键盘-0.5.0-通用版.dmg /绝对路径/手机键盘.app
+  zsh package.sh /绝对路径/手机键盘-0.6.0-通用版.dmg /绝对路径/手机键盘.app
 
-版本信息为 0.5.0，构建号为 8。以后调整版本时，请同步维护 Resources/Info.plist 与 package.sh 的版本检查。
+版本信息为 0.6.0，构建号为 9。打包脚本自动读取 Resources/Info.plist 并核对 App 版本。
+
+0.6.0 新增连接向导、系统配对窗口入口、有界服务恢复、单实例保护和脱敏诊断导出。当前用户一人验收，计划见 docs/Single-User-Acceptance.md；0.5.0 的实测结果不能代替本候选版验证。
+
+本地商店沙盒候选（不表示可提交商店）：
+  MACPHONEKEYS_BUILD_VARIANT=appstore zsh build.sh build/appstore/手机键盘.app
+  zsh scripts/validate-appstore.sh build/appstore/手机键盘.app --candidate
+
+商店构建启用 App Sandbox、Bluetooth 与用户选定文件权限，包含 PrivacyInfo.xcprivacy。发行签名、配置描述文件、商店打包与审核准备见 docs/AppStore-Readiness.md。普通 DMG 与商店交付物分别验收。
 
 签名：
 默认使用 ad-hoc 签名，仅适合开发检查。可以设置 MACPHONEKEYS_SIGN_IDENTITY 为钥匙串中已有证书的完整名称，再运行上述脚本。

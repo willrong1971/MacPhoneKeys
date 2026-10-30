@@ -56,6 +56,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         shortcutItem = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
         shortcutItem.isEnabled = false
         menu.addItem(.separator())
+        addItem(L("连接 iPhone…"), #selector(showConnectionAssistant))
         addItem(L("完整设置…"), #selector(showSettings))
         addItem(L("连接与使用说明"), #selector(showHelp))
         addItem(L("关于手机键盘"), #selector(showAbout))
@@ -81,7 +82,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         toggleItem.title = active || controller.captureActivation.pending != nil ? L("停止手机输入") : L("开始手机输入")
         toggleItem.isEnabled = controller.isConnected && !controller.isTesting
         connectionItem.title = controller.isLocalizationPreview ? L("界面预览，不向手机发送")
-            : controller.isConnected ? L("iPhone 已连接") : L("iPhone 未连接，请打开完整设置")
+            : controller.isConnected ? L("iPhone 已连接") : L("iPhone 未连接，请打开连接向导")
         shortcutItem.title = shortcutAvailable ? L("快捷键：⌃⌥K") : L("快捷键不可用，请关闭占用它的其他 App 后重开")
         surface.needsDisplay = true
     }
@@ -107,6 +108,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         DispatchQueue.main.async { [weak self] in self?.controller?.toggleMenuBarCapture() }
     }
     @objc private func showSettings() { controller?.showSettings() }
+    @objc private func showConnectionAssistant() { controller?.showConnectionAssistant() }
     @objc private func showHelp() { controller?.showHelp() }
     @objc private func showAbout() { controller?.showAbout() }
     @objc private func quit() { NSApp.terminate(nil) }
