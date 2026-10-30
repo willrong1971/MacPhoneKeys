@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 project_dir="${0:A:h}"
-dmg_path="${1:-$project_dir/build/手机键盘-0.6.0-通用版.dmg}"
+dmg_path="${1:-$project_dir/build/手机键盘-0.6.1-通用版.dmg}"
 dmg_path="${dmg_path:a}"
 [[ "$dmg_path" == *.dmg ]] || { print -u2 "输出路径必须以 .dmg 结尾。"; exit 1; }
 

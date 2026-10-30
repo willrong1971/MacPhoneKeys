@@ -6,7 +6,7 @@ protocol ConnectionAssistantDelegate: AnyObject {
     func connectionAssistantStartService()
     func connectionAssistantOpenBluetoothSettings()
     func connectionAssistantWillOpenSystemPairing()
-    func connectionAssistantDidFinishSystemPairing(_ result: PairingFlow.SystemPanelResult)
+    func connectionAssistantDidFinishSystemPairing(_ result: PairingFlow.SystemPanelResult, rawCode: Int32?, elapsedMilliseconds: Int)
     func connectionAssistantRecoverService()
     func connectionAssistantSendTest()
     func connectionAssistantReportPhoneText(visible: Bool)
@@ -223,7 +223,7 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         phoneInstructions.stringValue = LF("在 iPhone 打开“设置 → 蓝牙”，点“%@”。如果系统显示配对码，请核对两端一致后确认。", macName)
         switch flow.systemPanelResult {
         case .notOpened: pairingFeedback.stringValue = L("需要配对时打开系统窗口，只选择自己的 iPhone。已配对的手机可以直接点已有的 Mac 记录连接。")
-        case .open: pairingFeedback.stringValue = L("系统配对窗口已打开，请按系统提示操作。")
+        case .open: pairingFeedback.stringValue = L("系统配对处理中，请按系统提示操作。")
         case .cancelled: pairingFeedback.stringValue = L("已取消系统配对；键盘服务保持原状态。")
         case .selectionPaired: pairingFeedback.stringValue = L("系统面板已完成配对；仍需等待手机订阅键盘。")
         case .failed: pairingFeedback.stringValue = L("系统配对窗口未完成，请使用 Mac 蓝牙设置并检查手机提示。")
@@ -265,20 +265,29 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
     @objc private func openSystemPairing() {
         guard lastFlow.canOpenSystemPairing, pairingController == nil else { return }
         delegate?.connectionAssistantWillOpenSystemPairing()
-        let picker = IOBluetoothPairingController()
+        let startedAt = Date()
+        func elapsedMilliseconds() -> Int {
+            Int(max(0, (Date().timeIntervalSince(startedAt) * 1_000).rounded()))
+        }
+        guard let picker = MPKCreatePairingPanelController() else {
+            delegate?.connectionAssistantDidFinishSystemPairing(.failed, rawCode: nil,
+                                                                 elapsedMilliseconds: elapsedMilliseconds())
+            return
+        }
         pairingController = picker
         picker.setTitle(L("配对你自己的 iPhone"))
         picker.setDescriptionText(L("请保持 iPhone 的“设置 → 蓝牙”页面打开。只选择自己的 iPhone，并核对两端系统显示的配对码。取消不会清除已有配对。"))
         picker.clearAllowedUUIDs()
         picker.setOptions(IOBluetoothServiceBrowserControllerOptions(kIOBluetoothServiceBrowserControllerOptionsAutoStartInquiry))
         let result = picker.runModal()
+        let elapsed = elapsedMilliseconds()
         pairingController = nil
         if result == kIOBluetoothUISuccess {
-            delegate?.connectionAssistantDidFinishSystemPairing(.selectionPaired)
+            delegate?.connectionAssistantDidFinishSystemPairing(.selectionPaired, rawCode: result, elapsedMilliseconds: elapsed)
         } else if result == kIOBluetoothUIUserCanceledErr {
-            delegate?.connectionAssistantDidFinishSystemPairing(.cancelled)
+            delegate?.connectionAssistantDidFinishSystemPairing(.cancelled, rawCode: result, elapsedMilliseconds: elapsed)
         } else {
-            delegate?.connectionAssistantDidFinishSystemPairing(.failed)
+            delegate?.connectionAssistantDidFinishSystemPairing(.failed, rawCode: result, elapsedMilliseconds: elapsed)
         }
         if window?.isVisible == true { window?.makeKeyAndOrderFront(nil) }
     }

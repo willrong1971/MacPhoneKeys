@@ -50,6 +50,14 @@ struct DiagnosticReportTests {
         let categories = (english["recentEvents"] as! [[String: String]]).map { $0["event"]! }
         precondition(categories == ["advertisingStarted", "inputSubscribed", "captureStopped", "serviceStopped"],
                      "English advertising/capture events must not invent a keyboard subscription or service stop")
+        let panelReport = DiagnosticReportBuilder.make(snapshot: ["pairingAssistant": [
+            "systemPairingPanel": "cancelled", "systemPairingReturnCode": -1001,
+            "systemPairingElapsedMilliseconds": 1200, "passkey": "private-passkey"
+        ]], logLines: [], version: "0.6.1", systemVersion: "26.6.2", architecture: "arm64")
+        let panel = panelReport["connectionAssistant"] as! [String: Any]
+        precondition(panel["systemPairingReturnCode"] as? Int == -1001, "SDK panel results include negative success/cancel codes")
+        precondition(panel["systemPairingElapsedMilliseconds"] as? Int == 1200)
+        precondition(panel["passkey"] == nil, "Pairing passkeys are never diagnostics")
         print("Diagnostic privacy, confirmation boundaries, invalid inputs, and bounded export: passed")
     }
 }

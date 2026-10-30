@@ -1,6 +1,6 @@
 # Mac App Store 发行准备
 
-检查日期：2026-10-30。作者：九福爸爸 9fbaba。
+检查日期：2026-10-31。作者：九福爸爸 9fbaba。
 
 本文件记录发行要求与待验证事项，不表示 App 已通过审核、已上传、已经公证或已完成沙盒真机验证。当前正常使用的安装版应继续保留，候选版另行验证。
 
@@ -61,7 +61,7 @@ zsh scripts/package-appstore.sh build/store-release/手机键盘.app
 | 项目 | 已知情况 | 商店候选版验收 |
 | --- | --- | --- |
 | BLE peripheral | CoreBluetooth 与 Bluetooth 沙盒权限均为公开接口 | 在沙盒内完成服务注册、实际广播、加密输入订阅和手机可见文字验证 |
-| 系统配对窗口 | `IOBluetoothPairingController` 是公开 API，能显示搜索与配对窗口 | 确认沙盒内能找到目标手机、正常取消和完成配对；窗口成功不等于键盘订阅成功 |
+| 系统配对窗口 | `IOBluetoothPairingController` 是公开 API；0.6.1 由 Objective-C 薄桥调用其公开工厂创建窗口 | 确认沙盒内能找到目标手机、正常取消和完成配对；窗口成功不等于键盘订阅成功 |
 | BLE HID 服务 | 实现使用标准 HID UUID `1812` 的完整 128 位表达 | 必须实测当前系统；没有找到 Apple 对依赖 UUID 表达长度差异注册行为的支持承诺 |
 | 菜单栏 App | `LSUIElement` 是公开的 agent App 配置 | 菜单、完整设置、帮助、退出、首次连接向导均可发现和使用 |
 | 快捷键 | 当前使用公开的 `RegisterEventHotKey`，默认包含 Control 修饰键 | 在沙盒内验证注册、冲突提示、开始/停止与失焦释放；不扩展为全局按键监听 |

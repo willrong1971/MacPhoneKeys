@@ -1,7 +1,8 @@
-MacPhoneKeys 0.6.0 (9) — Reliability candidate
+MacPhoneKeys 0.6.1 (10) — Reliability candidate
 Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
 
-VERSION 0.6.0 CANDIDATE
+VERSION 0.6.x CANDIDATE
+Version 0.6.1 fixes creation of the public system pairing window.
 Connect iPhone… opens a connection assistant with a public system pairing
 panel, separate Mac preparation and keyboard-subscription evidence, and
 user-confirmed phone text. New users see it on first launch; returning users
@@ -41,7 +42,7 @@ interface does not switch immediately. This setting does not change the
 iPhone's input method or hardware-keyboard layout.
 
 INSTALLATION
-1. Open 手机键盘-0.6.0-通用版.dmg and drag the app to Applications.
+1. Open 手机键盘-0.6.1-通用版.dmg and drag the app to Applications.
 2. Open the app from Applications and allow Bluetooth access when prompted.
 3. Eject the disk image after installation. Run only one copy of the app.
 

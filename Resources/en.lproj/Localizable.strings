@@ -175,3 +175,9 @@
 "无法保存诊断报告" = "Could Not Save Diagnostic Report";
 "自动恢复已结束。可手动重建一次服务，或导出诊断报告。" = "Automatic recovery has ended. You can manually rebuild the service once, or export diagnostics.";
 "此按钮每次只请求一次手动恢复。" = "This button requests one manual recovery per click.";
+
+/* Public Objective-C pairing factory diagnostics */
+"系统配对处理中，请按系统提示操作。" = "System pairing is in progress. Follow any system prompts.";
+"用户请求系统配对窗口；等待系统返回。" = "The user requested system pairing; waiting for the system response.";
+"系统配对面板返回码 %d，耗时 %ld 毫秒；不记录设备或配对码。" = "System pairing returned code %d after %ld milliseconds; no device or pairing code is recorded.";
+"系统配对控制器未能创建；请使用 Mac 蓝牙设置。" = "The system pairing controller could not be created. Use Mac Bluetooth settings.";

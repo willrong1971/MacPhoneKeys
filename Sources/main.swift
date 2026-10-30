@@ -427,11 +427,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func connectionAssistantWillOpenSystemPairing() {
         cancelTest(); endCapture()
         pairingFlow.systemPanelDidOpen()
-        appendLog(L("用户打开系统配对窗口；等待系统结果和键盘订阅。"))
+        appendLog(L("用户请求系统配对窗口；等待系统返回。"))
         updateUI()
     }
-    func connectionAssistantDidFinishSystemPairing(_ result: PairingFlow.SystemPanelResult) {
-        pairingFlow.systemPanelDidFinish(result)
+    func connectionAssistantDidFinishSystemPairing(_ result: PairingFlow.SystemPanelResult, rawCode: Int32?, elapsedMilliseconds: Int) {
+        pairingFlow.systemPanelDidFinish(result, rawCode: rawCode, elapsedMilliseconds: elapsedMilliseconds)
+        if let rawCode {
+            appendLog(LF("系统配对面板返回码 %d，耗时 %ld 毫秒；不记录设备或配对码。", rawCode, elapsedMilliseconds))
+        } else {
+            appendLog(L("系统配对控制器未能创建；请使用 Mac 蓝牙设置。"))
+        }
         switch result {
         case .selectionPaired: appendLog(L("系统配对面板返回成功；不代表键盘订阅或手机文字验证成功。"))
         case .cancelled: appendLog(L("用户取消系统配对；未清除配对记录或重建键盘服务。"))

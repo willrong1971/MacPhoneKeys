@@ -40,12 +40,17 @@ enum DiagnosticReportBuilder {
                 transport["lastFailure"] = failure
             }
         }
-        var assistant: [String: String] = [:]
+        var assistant: [String: Any] = [:]
         if let flow = snapshot["pairingAssistant"] as? [String: Any] {
             if let panel = flow["systemPairingPanel"] as? String,
                ["notOpened", "open", "cancelled", "selectionPaired", "failed"].contains(panel) { assistant["systemPairingPanel"] = panel }
             if let verification = flow["phoneTextVerification"] as? String,
                ["notTested", "sending", "awaitingUser", "visibleByUser", "notVisibleByUser"].contains(verification) { assistant["phoneTextVerification"] = verification }
+            if let value = flow["systemPairingReturnCode"], !(value is Bool), let code = value as? Int,
+               (Int(Int32.min)...Int(Int32.max)).contains(code) { assistant["systemPairingReturnCode"] = code }
+            if let elapsed = nonnegativeInteger(flow["systemPairingElapsedMilliseconds"]) {
+                assistant["systemPairingElapsedMilliseconds"] = elapsed
+            }
         }
         let recent = Array(logLines.suffix(300))
         let events = recent.compactMap(event).suffix(100)

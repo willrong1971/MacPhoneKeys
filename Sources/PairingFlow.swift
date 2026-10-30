@@ -70,6 +70,8 @@ struct PairingFlow {
     private(set) var observation = Observation()
     private(set) var systemPanelResult = SystemPanelResult.notOpened
     private(set) var systemPanelOpen = false
+    private(set) var systemPanelReturnCode: Int32?
+    private(set) var systemPanelElapsedMilliseconds: Int?
     private var connectionEpoch = 0
     private var testAttempt: TestAttempt?
     private var lastManualReport: ManualReport?
@@ -120,11 +122,15 @@ struct PairingFlow {
     mutating func systemPanelDidOpen() {
         systemPanelOpen = true
         systemPanelResult = .open
+        systemPanelReturnCode = nil
+        systemPanelElapsedMilliseconds = nil
     }
 
-    mutating func systemPanelDidFinish(_ result: SystemPanelResult) {
+    mutating func systemPanelDidFinish(_ result: SystemPanelResult, rawCode: Int32? = nil, elapsedMilliseconds: Int? = nil) {
         systemPanelOpen = false
         systemPanelResult = result
+        systemPanelReturnCode = rawCode
+        systemPanelElapsedMilliseconds = elapsedMilliseconds.map { max(0, $0) }
         // No transport state is inferred from the system panel's return code.
     }
 
@@ -173,6 +179,8 @@ struct PairingFlow {
             "verificationSource": "userObservation",
             "preview": observation.isPreview
         ]
+        if let code = systemPanelReturnCode { result["systemPairingReturnCode"] = Int(code) }
+        if let elapsed = systemPanelElapsedMilliseconds { result["systemPairingElapsedMilliseconds"] = elapsed }
         if let report = lastManualReport {
             result["lastUserReportedVisible"] = report.visible
             result["lastUserReportAt"] = ISO8601DateFormatter().string(from: report.date)

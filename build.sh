@@ -30,6 +30,9 @@ source_files=(Localization.swift AppPreferences.swift GlobalHotKey.swift Capture
 for source_file in "${source_files[@]}"; do
   cp "$project_dir/Sources/$source_file" "$staging_dir/Sources/$source_file"
 done
+for bridge_file in PairingPanelFactory.h PairingPanelFactory.m; do
+  cp "$project_dir/Sources/$bridge_file" "$staging_dir/Sources/$bridge_file"
+done
 for localization_dir in "$project_dir"/Resources/*.lproj(N/); do
   ditto "$localization_dir" "$staged_app/Contents/Resources/${localization_dir:t}"
 done
@@ -55,11 +58,17 @@ snapshot_sources=()
 for source_file in "${source_files[@]}"; do snapshot_sources+=("$staging_dir/Sources/$source_file"); done
 for target_arch in arm64 x86_64; do
   print -u2 -- "编译 $target_arch，最低 macOS $minimum_macos…"
+  xcrun clang -fobjc-arc -fmodules -isysroot "$sdk_path" \
+    -target "$target_arch-apple-macos$minimum_macos" \
+    -c "$staging_dir/Sources/PairingPanelFactory.m" \
+    -o "$staging_dir/PairingPanelFactory-$target_arch.o"
   xcrun swiftc -swift-version 5 -O -sdk "$sdk_path" \
     -target "$target_arch-apple-macos$minimum_macos" \
     -module-cache-path "$staging_dir/ModuleCache/$target_arch" \
     -framework AppKit -framework Carbon -framework CoreBluetooth -framework IOBluetooth -framework IOBluetoothUI \
+    -import-objc-header "$staging_dir/Sources/PairingPanelFactory.h" \
     "${snapshot_sources[@]}" \
+    "$staging_dir/PairingPanelFactory-$target_arch.o" \
     -o "$staging_dir/MacPhoneKeys-$target_arch"
 done
 xcrun lipo -create "$staging_dir/MacPhoneKeys-arm64" "$staging_dir/MacPhoneKeys-x86_64" \

@@ -30,6 +30,20 @@ import Foundation
         expect(!flow.observation.keyboardReady && !flow.canSendTest, "a system pairing result does not create an input subscription")
         flow.systemPanelDidOpen(); flow.systemPanelDidFinish(.cancelled)
         expect(flow.systemPanelResult == .cancelled && flow.observation == observation(), "cancelling leaves transport evidence untouched")
+        flow.systemPanelDidOpen()
+        flow.systemPanelDidFinish(.failed, rawCode: -42, elapsedMilliseconds: 2)
+        expect(flow.systemPanelReturnCode == -42 && flow.systemPanelElapsedMilliseconds == 2,
+               "an immediate panel failure retains its actual signed return code and elapsed time")
+        expect(flow.diagnosticSnapshot["systemPairingReturnCode"] as? Int == -42,
+               "diagnostics preserve signed panel codes without a device or passcode")
+        expect(!flow.observation.keyboardReady && !flow.canSendTest,
+               "panel diagnostics cannot establish transport readiness")
+        flow.systemPanelDidOpen()
+        expect(flow.systemPanelReturnCode == nil && flow.systemPanelElapsedMilliseconds == nil,
+               "a new request clears the previous panel diagnostics")
+        flow.systemPanelDidFinish(.failed, elapsedMilliseconds: 0)
+        expect(flow.systemPanelReturnCode == nil && flow.systemPanelResult == .failed,
+               "failure to create the public factory is distinct from a runModal return code")
         flow.observe(ready)
         expect(flow.observation.keyboardReady && flow.canSendTest, "encrypted current input evidence enables a trial")
         expect(!flow.canOpenSystemPairing, "an existing keyboard session does not offer unnecessary new pairing")
