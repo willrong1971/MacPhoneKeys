@@ -24,74 +24,68 @@ func rounded(_ rect: NSRect, radius: CGFloat) -> NSBezierPath {
     NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
 }
 
-func shadowedFill(_ path: NSBezierPath, fill: NSColor) {
-    NSGraphicsContext.saveGraphicsState()
-    let shadow = NSShadow()
-    shadow.shadowColor = color(0, 27, 91, alpha: 0.22)
-    shadow.shadowBlurRadius = 13
-    shadow.shadowOffset = NSSize(width: 0, height: -8)
-    shadow.set()
-    fill.setFill()
-    path.fill()
-    NSGraphicsContext.restoreGraphicsState()
-}
-
-func drawArtwork() {
+// One sculpted key with phone proportions. The Return mark belongs to its face,
+// so the symbol stays a single object at Finder and menu-bar sizes.
+func drawArtwork(backingScale: CGFloat) {
     let tile = rounded(NSRect(x: 80, y: 80, width: 864, height: 864), radius: 196)
     NSGraphicsContext.saveGraphicsState()
     let tileShadow = NSShadow()
     tileShadow.shadowColor = NSColor.black.withAlphaComponent(0.18)
-    tileShadow.shadowBlurRadius = 32
-    tileShadow.shadowOffset = NSSize(width: 0, height: -13)
+    // NSShadow uses device-space distances, unlike the scaled vector paths.
+    tileShadow.shadowBlurRadius = 30 * backingScale
+    tileShadow.shadowOffset = NSSize(width: 0, height: -12 * backingScale)
     tileShadow.set()
-    color(20, 92, 225).setFill()
+    color(25, 85, 208).setFill()
     tile.fill()
     NSGraphicsContext.restoreGraphicsState()
-    NSGradient(starting: color(9, 67, 187), ending: color(44, 129, 250))!
-        .draw(in: tile, angle: 65)
+    NSGradient(colorsAndLocations:
+        (color(29, 64, 182), 0),
+        (color(29, 105, 232), 0.52),
+        (color(69, 161, 250), 1))!.draw(in: tile, angle: 70)
     let edge = rounded(NSRect(x: 82, y: 82, width: 860, height: 860), radius: 194)
-    NSColor.white.withAlphaComponent(0.16).setStroke()
+    NSColor.white.withAlphaComponent(0.20).setStroke()
     edge.lineWidth = 3
     edge.stroke()
 
-    // The generous key shapes and single space bar remain distinct at small sizes.
-    let white = color(246, 250, 255)
-    shadowedFill(rounded(NSRect(x: 176, y: 270, width: 484, height: 300), radius: 43), fill: white)
-    let keyColor = color(39, 109, 226)
-    keyColor.setFill()
-    for y: CGFloat in [466, 400] {
-        for column in 0..<7 {
-            rounded(NSRect(x: 211 + CGFloat(column) * 61, y: y, width: 46, height: 46), radius: 9).fill()
-        }
-    }
-    rounded(NSRect(x: 211, y: 334, width: 46, height: 46), radius: 9).fill()
-    rounded(NSRect(x: 272, y: 334, width: 291, height: 46), radius: 9).fill()
-    rounded(NSRect(x: 577, y: 334, width: 46, height: 46), radius: 9).fill()
+    // The shallow lower lip makes this a physical keyboard key; the tall face
+    // and inset speaker make the same silhouette read as a phone.
+    let base = rounded(NSRect(x: 282, y: 204, width: 460, height: 590), radius: 108)
+    NSGraphicsContext.saveGraphicsState()
+    let keyShadow = NSShadow()
+    keyShadow.shadowColor = color(7, 30, 105, alpha: 0.32)
+    keyShadow.shadowBlurRadius = 28 * backingScale
+    keyShadow.shadowOffset = NSSize(width: 0, height: -20 * backingScale)
+    keyShadow.set()
+    color(179, 207, 247).setFill()
+    base.fill()
+    NSGraphicsContext.restoreGraphicsState()
 
-    // A blank blue screen and two broad inset details identify the phone without
-    // miniature text, labels, logos or decorative UI.
-    shadowedFill(rounded(NSRect(x: 660, y: 300, width: 194, height: 430), radius: 44), fill: white)
-    let screen = rounded(NSRect(x: 678, y: 322, width: 158, height: 386), radius: 28)
-    NSGradient(starting: color(25, 89, 210), ending: color(38, 115, 235))!
-        .draw(in: screen, angle: 90)
-    white.setFill()
-    rounded(NSRect(x: 722, y: 681, width: 69, height: 11), radius: 5.5).fill()
-    rounded(NSRect(x: 720, y: 340, width: 73, height: 9), radius: 4.5).fill()
+    let face = rounded(NSRect(x: 282, y: 232, width: 460, height: 574), radius: 108)
+    NSGradient(starting: color(228, 239, 255), ending: color(255, 255, 255))!
+        .draw(in: face, angle: 90)
+    NSColor.white.withAlphaComponent(0.85).setStroke()
+    face.lineWidth = 3
+    face.stroke()
 
-    // An open, simple Bluetooth connection mark balances the two device shapes.
-    let connection = NSBezierPath()
-    connection.move(to: NSPoint(x: 447, y: 610))
-    connection.line(to: NSPoint(x: 447, y: 790))
-    connection.line(to: NSPoint(x: 507, y: 742))
-    connection.line(to: NSPoint(x: 387, y: 658))
-    connection.move(to: NSPoint(x: 387, y: 742))
-    connection.line(to: NSPoint(x: 507, y: 658))
-    connection.line(to: NSPoint(x: 447, y: 610))
-    connection.lineWidth = 17
-    connection.lineCapStyle = .round
-    connection.lineJoinStyle = .round
-    white.setStroke()
-    connection.stroke()
+    let ink = color(27, 96, 214)
+    ink.setFill()
+    rounded(NSRect(x: 450, y: 718, width: 124, height: 26), radius: 13).fill()
+
+    let returnMark = NSBezierPath()
+    returnMark.move(to: NSPoint(x: 638, y: 615))
+    returnMark.line(to: NSPoint(x: 638, y: 495))
+    returnMark.curve(to: NSPoint(x: 604, y: 461),
+                     controlPoint1: NSPoint(x: 638, y: 472),
+                     controlPoint2: NSPoint(x: 627, y: 461))
+    returnMark.line(to: NSPoint(x: 398, y: 461))
+    returnMark.move(to: NSPoint(x: 471, y: 534))
+    returnMark.line(to: NSPoint(x: 398, y: 461))
+    returnMark.line(to: NSPoint(x: 471, y: 388))
+    returnMark.lineWidth = 48
+    returnMark.lineCapStyle = .round
+    returnMark.lineJoinStyle = .round
+    ink.setStroke()
+    returnMark.stroke()
 }
 
 func renderPNG(pixels: Int, at destination: URL) throws {
@@ -110,7 +104,7 @@ func renderPNG(pixels: Int, at destination: URL) throws {
     context.cgContext.setShouldAntialias(true)
     let scale = CGFloat(pixels) / 1024
     context.cgContext.scaleBy(x: scale, y: scale)
-    drawArtwork()
+    drawArtwork(backingScale: scale)
     context.flushGraphics()
     NSGraphicsContext.restoreGraphicsState()
     bitmap.size = NSSize(width: pixels, height: pixels)

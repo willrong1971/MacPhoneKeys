@@ -267,7 +267,7 @@ After changing Simplified Chinese translations, run `xcrun swift scripts/generat
 | --- | --- |
 | `Sources/main.swift` | Localized menu bar, full settings, input panel and foreground keyboard events. |
 | `Sources/MenuBarController.swift` | Menu bar icon, left/right clicks and menu. |
-| `Sources/MenuBarIcon.swift` | The keyboard → phone vector menu bar icon. |
+| `Sources/MenuBarIcon.swift` | Unified phone-shaped input key, with outline and filled menu bar states. |
 | `Sources/AppPreferences.swift` | Input hint defaults and saved preference. |
 | `Sources/GlobalHotKey.swift` | Global input-toggle shortcut and conflict handling. |
 | `Sources/KeyMapping.swift` | Mac key codes to HID usages. |

@@ -1,6 +1,6 @@
 import AppKit
 
-/// A template mask drawn at menu-bar size: keyboard → iPhone.
+/// A single phone-shaped input key, matching the app icon.
 /// The status item supplies the inactive opacity and the system supplies its tint.
 enum MenuBarIcon {
     static func image(active: Bool) -> NSImage {
@@ -10,48 +10,38 @@ enum MenuBarIcon {
             NSColor.black.setFill()
             NSColor.black.setStroke()
 
-            let keyboard = roundedRect(NSRect(x: 0.95, y: 4.2, width: 10.8, height: 11.6), radius: 1.65)
-            let keys: [NSBezierPath] = (0..<2).flatMap { row -> [NSBezierPath] in
-                (0..<3).map { column in
-                    roundedRect(NSRect(x: 2.6 + CGFloat(column) * 2.8,
-                                       y: 6.55 + CGFloat(row) * 4.0,
-                                       width: 1.9, height: 2.9), radius: 0.45)
-                }
-            }
-            let phone = roundedRect(NSRect(x: 20.0, y: 1.25, width: 7.05, height: 17.5), radius: 1.85)
-            let speaker = roundedRect(NSRect(x: 22.25, y: 15.75, width: 2.55, height: 1.0), radius: 0.5)
-            let homeBar = roundedRect(NSRect(x: 22.25, y: 3.25, width: 2.55, height: 1.0), radius: 0.5)
+            let key = roundedRect(NSRect(x: 6.5, y: 1.25, width: 15, height: 17.5), radius: 4)
+            let speaker = roundedRect(NSRect(x: 12, y: 15.3, width: 4, height: 1.25), radius: 0.625)
+            let returnMark = NSBezierPath()
+            returnMark.move(to: NSPoint(x: 18, y: 12.4))
+            returnMark.line(to: NSPoint(x: 16.3, y: 12.4))
+            returnMark.line(to: NSPoint(x: 16.3, y: 9.2))
+            returnMark.line(to: NSPoint(x: 12.2, y: 9.2))
+            returnMark.line(to: NSPoint(x: 13.75, y: 10.75))
+            returnMark.line(to: NSPoint(x: 12.55, y: 11.95))
+            returnMark.line(to: NSPoint(x: 9, y: 8.4))
+            returnMark.line(to: NSPoint(x: 12.55, y: 4.85))
+            returnMark.line(to: NSPoint(x: 13.75, y: 6.05))
+            returnMark.line(to: NSPoint(x: 12.2, y: 7.6))
+            returnMark.line(to: NSPoint(x: 16.5, y: 7.6))
+            returnMark.curve(to: NSPoint(x: 18, y: 9.1),
+                             controlPoint1: NSPoint(x: 17.5, y: 7.6),
+                             controlPoint2: NSPoint(x: 18, y: 8.1))
+            returnMark.close()
 
             if active {
                 // Even-odd holes stay transparent rather than painting a background
                 // color, so template tinting also works in dark menu bars.
-                keyboard.windingRule = .evenOdd
-                keys.forEach { keyboard.append($0) }
-                keyboard.fill()
-                phone.windingRule = .evenOdd
-                phone.append(speaker)
-                phone.append(homeBar)
-                phone.fill()
+                key.windingRule = .evenOdd
+                key.append(speaker)
+                key.append(returnMark)
+                key.fill()
             } else {
-                keyboard.lineWidth = 1.7
-                keyboard.stroke()
-                keys.forEach { $0.fill() }
-                phone.lineWidth = 1.7
-                phone.stroke()
+                key.lineWidth = 1.7
+                key.stroke()
                 speaker.fill()
-                homeBar.fill()
+                returnMark.fill()
             }
-
-            let arrow = NSBezierPath()
-            arrow.lineWidth = 1.8
-            arrow.lineCapStyle = .round
-            arrow.lineJoinStyle = .round
-            arrow.move(to: NSPoint(x: 13.25, y: 10.0))
-            arrow.line(to: NSPoint(x: 17.8, y: 10.0))
-            arrow.move(to: NSPoint(x: 15.6, y: 12.35))
-            arrow.line(to: NSPoint(x: 17.95, y: 10.0))
-            arrow.line(to: NSPoint(x: 15.6, y: 7.65))
-            arrow.stroke()
             return true
         }
         image.isTemplate = true

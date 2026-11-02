@@ -58,21 +58,21 @@ enum MenuBarIconPreviews {
                 label(dark ? "Dark menu bar" : "Light menu bar", x: origin + 20, y: 305,
                       color: foreground, size: 15)
                 label("Actual size · 38 pt status item", x: origin + 20, y: 278,
-                      color: foreground.withAlphaComponent(0.75), size: 11)
+                      color: foreground.withAlphaComponent(0.78), size: 11)
 
                 for active in [false, true] {
                     let column: CGFloat = active ? 170 : 20
-                    let alpha: CGFloat = active ? 1 : 0.75
+                    let alpha: CGFloat = active ? 1 : 0.78
                     let color = foreground.withAlphaComponent(alpha)
                     let image = NSImage(size: NSSize(width: 28, height: 20))
                     image.addRepresentation(glyph(active: active, color: color, scale: 10))
                     image.draw(in: NSRect(x: origin + column + 5, y: 241, width: 28, height: 20))
-                    label(active ? "Active" : "Inactive · 75%", x: origin + column, y: 219,
+                    label(active ? "Active" : "Inactive · 78%", x: origin + column, y: 219,
                           color: foreground, size: 11)
                     image.draw(in: NSRect(x: origin + column, y: 80, width: 140, height: 100))
                 }
                 label("5× detail · transparent template mask", x: origin + 20, y: 42,
-                      color: foreground.withAlphaComponent(0.75), size: 11)
+                      color: foreground.withAlphaComponent(0.78), size: 11)
             }
         }
     }

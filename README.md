@@ -193,7 +193,7 @@ python3 scripts/make-localization-previews.py build/手机键盘.app
 | --- | --- |
 | `Sources/main.swift` | 本地化菜单栏、完整设置、输入提示面板与前台键盘事件 |
 | `Sources/MenuBarController.swift` | 菜单栏图标、左右键操作与菜单 |
-| `Sources/MenuBarIcon.swift` | “键盘 → 手机”的菜单栏矢量图标 |
+| `Sources/MenuBarIcon.swift` | 一体式“手机输入键”菜单栏矢量图标（空心／实心状态） |
 | `Sources/AppPreferences.swift` | 输入提示浮窗开关的默认值与持久化 |
 | `Sources/GlobalHotKey.swift` | 全局输入切换快捷键与冲突处理 |
 | `Sources/KeyMapping.swift` | Mac 键码到 HID 键码的映射 |
