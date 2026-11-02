@@ -1,14 +1,13 @@
 import AppKit
 
 /// A single phone-shaped input key, matching the app icon.
-/// The status item supplies the inactive opacity and the system supplies its tint.
+/// Fixed black artwork with white linework; the status item dims it when idle.
 enum MenuBarIcon {
     static func image(active: Bool) -> NSImage {
         let image = NSImage(size: NSSize(width: 28, height: 20), flipped: false) { _ in
             NSGraphicsContext.saveGraphicsState()
             defer { NSGraphicsContext.restoreGraphicsState() }
             NSColor.black.setFill()
-            NSColor.black.setStroke()
 
             let key = roundedRect(NSRect(x: 6.5, y: 1.25, width: 15, height: 17.5), radius: 4)
             let speaker = roundedRect(NSRect(x: 12, y: 15.3, width: 4, height: 1.25), radius: 0.625)
@@ -29,22 +28,18 @@ enum MenuBarIcon {
                              controlPoint2: NSPoint(x: 18, y: 8.1))
             returnMark.close()
 
-            if active {
-                // Even-odd holes stay transparent rather than painting a background
-                // color, so template tinting also works in dark menu bars.
-                key.windingRule = .evenOdd
-                key.append(speaker)
-                key.append(returnMark)
-                key.fill()
-            } else {
-                key.lineWidth = 1.7
-                key.stroke()
-                speaker.fill()
-                returnMark.fill()
-            }
+            key.fill()
+            let lineColor = NSColor(calibratedWhite: active ? 1 : 0.62, alpha: 1)
+            lineColor.setStroke()
+            lineColor.setFill()
+            key.lineWidth = 1.2
+            key.stroke()
+            speaker.fill()
+            returnMark.fill()
             return true
         }
-        image.isTemplate = true
+        // Keep the requested black-and-white palette in either menu-bar theme.
+        image.isTemplate = false
         return image
     }
 

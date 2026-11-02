@@ -99,7 +99,7 @@
 "Esc 或 ⌃⌥K 停止 · 切到其他窗口自动停止" = "Esc or ⌃⌥K to stop · Switching windows stops input";
 "无法注册 ⌃⌥K 快捷键（%@）；仍可点击菜单栏图标。" = "Could not register ⌃⌥K (%@). Click the menu bar icon to toggle input.";
 "日常点击菜单栏图标或按 ⌃⌥K；关闭此窗口后，App 继续在菜单栏运行。" = "Click the menu bar icon or press ⌃⌥K. Closing this window keeps the app in the menu bar.";
-"日常使用：点击菜单栏图标或按 ⌃⌥K，切换手机输入。实心图标表示正在手机输入，灰色轮廓表示本机输入。按 Esc 或切到其他窗口也会停止。右键图标可打开完整设置。" = "Click the menu bar icon or press ⌃⌥K to toggle phone input. A filled icon means phone input is active; a gray outline means input stays on your Mac. Esc or switching windows also stops input. Right-click the icon to open Full Settings.";
+"日常使用：点击菜单栏图标或按 ⌃⌥K，切换手机输入。白色线条亮起表示正在手机输入，图标变灰表示本机输入。按 Esc 或切到其他窗口也会停止。右键图标可打开完整设置。" = "Click the menu bar icon or press ⌃⌥K to toggle phone input. Bright white lines mean phone input is active; a dimmed icon means input stays on your Mac. Esc or switching windows also stops input. Right-click the icon to open Full Settings.";
 "请在主线程注册快捷键。" = "Register the shortcut on the main thread.";
 "此快捷键已被其他 App 或系统占用。" = "This shortcut is already registered by another app or system shortcut.";
 "系统不接受此按键与修饰键组合。" = "The system did not accept this key code and modifier combination.";

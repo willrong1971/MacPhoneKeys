@@ -84,7 +84,7 @@ Distributors must arrange their own appropriate signing and notarization. See [A
 1. Open **MacPhoneKeys** on the Mac, find its app icon in the menu bar, and wait for the service to start.
 2. When pairing is needed, first use the guide's **Start System Bluetooth Assistant…** action. Then open **Settings → Bluetooth** on the iPhone, select the **Mac's system name**, and compare the codes shown on both devices. The name may differ from “MacPhoneKeys” or “MacKeys.” If the assistant is unavailable, use the fallback pairing panel or Mac Bluetooth settings. The sandbox candidate provides only those fallback routes.
 3. Open Notes or another app on the iPhone and tap the text field where you want to type. Make sure its cursor is active.
-4. Once the connection is ready, left-click the Mac's menu bar icon or press **Control + Option + K**. Wait for the icon to become filled, then type using the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac. The input hint window is shown by default; you can turn it off in full settings.
+4. Once the connection is ready, left-click the Mac's menu bar icon or press **Control + Option + K**. Wait for the icon’s white linework to brighten, then type using the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac. The input hint window is shown by default; you can turn it off in full settings.
 5. Press **Esc**, press the shortcut again, click the menu bar icon again, or switch to another Mac window to stop forwarding input and request key release.
 
 For an initial check, right-click the menu bar icon, choose **Full Settings…**, and click **Send English Test**. In the confirmation dialog, choose **Send Test Text** to send `mac keyboard test 123` without pressing Return, or **Cancel** to leave the phone unchanged. For this literal test string, use an English/US hardware keyboard layout on the iPhone.
@@ -93,7 +93,7 @@ Confirm that the text actually appears on the iPhone. **Accepted keys** includes
 
 ## Menu bar and shortcut
 
-- The menu bar uses a wider vector **keyboard → phone** icon with thicker lines. A **filled icon** means capture has actually gained input focus and input is being forwarded to iPhone. A **gray outline** means local Mac input. Requesting activation alone does not fill the icon, and its fill does not prove that the iPhone displayed any text.
+- The menu bar uses a unified **phone-shaped input key**, with a black body and white linework. **Bright white lines** mean capture has actually gained input focus and input is being forwarded to iPhone. A **dimmed icon** means local Mac input. Requesting activation alone does not brighten the icon, and its appearance does not prove that the iPhone displayed any text.
 - Left-click the icon to toggle iPhone input. Right-click it for **Start phone input** / **Stop phone input**, **Full Settings…**, help and quit.
 - The default global shortcut is **Control + Option + K**. If another app has already registered it, MacPhoneKeys reports the conflict; the icon and menu remain available.
 - **Show input hint window** in full settings is enabled by default, and your choice is saved. When it is turned off, input still works and the menu bar icon provides the status indication. **Esc**, the shortcut again, or losing focus still stops capture.
@@ -267,7 +267,7 @@ After changing Simplified Chinese translations, run `xcrun swift scripts/generat
 | --- | --- |
 | `Sources/main.swift` | Localized menu bar, full settings, input panel and foreground keyboard events. |
 | `Sources/MenuBarController.swift` | Menu bar icon, left/right clicks and menu. |
-| `Sources/MenuBarIcon.swift` | Unified phone-shaped input key, with outline and filled menu bar states. |
+| `Sources/MenuBarIcon.swift` | Unified phone-shaped input key: black body, white linework, dimmed when inactive. |
 | `Sources/AppPreferences.swift` | Input hint defaults and saved preference. |
 | `Sources/GlobalHotKey.swift` | Global input-toggle shortcut and conflict handling. |
 | `Sources/KeyMapping.swift` | Mac key codes to HID usages. |

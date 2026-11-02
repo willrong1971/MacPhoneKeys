@@ -75,7 +75,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let active = controller.capturing
         let state = active ? L("正在向 iPhone 输入") : L("本机输入")
         statusItem.button?.image = MenuBarIcon.image(active: active)
-        // Keep the inactive outline visible in both light and dark menu bars.
+        // Dim the monochrome icon while input stays on this Mac.
         statusItem.button?.alphaValue = active ? 1 : 0.78
         statusItem.button?.setAccessibilityValue(state)
         statusItem.button?.toolTip = LF("%@ · 点击切换 · ⌃⌥K · 右键打开完整设置", state)

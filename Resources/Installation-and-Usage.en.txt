@@ -41,11 +41,11 @@ on another OS version; the fallback routes remain available.
 Use a Mac keyboard to type on an iPhone over Bluetooth. The devices may use
 different Apple IDs. No iPhone app is required.
 
-The app stays in the menu bar without a Dock icon. It uses a wider vector
-keyboard → phone icon with thicker lines. Left-click the icon or press
-Control + Option + K to toggle iPhone input. The icon becomes
-filled only after capture gains input focus; a gray outline means local Mac input. The icon does
-not prove that text appeared on the phone.
+The app stays in the menu bar without a Dock icon. Its unified phone-shaped
+input key has a black body and white linework. Left-click it or press
+Control + Option + K to toggle iPhone input. The white lines brighten only
+after capture gains input focus; a dimmed icon means local Mac input.
+The icon does not prove that text appeared on the phone.
 
 The app's English name is MacPhoneKeys; its Chinese name is 手机键盘.
 The build output path remains build/手机键盘.app in every interface language.
@@ -87,7 +87,7 @@ PAIRING AND TYPING
    the insertion cursor is visible. Use an English/US hardware-keyboard layout
    for the first literal English test.
 4. Once connected, left-click the menu bar icon or press Control + Option + K.
-   Wait for the icon to become filled before typing. The input hint window is
+   Wait for the icon’s white linework to brighten before typing. The input hint window is
    shown by default; you can turn it off in full settings.
 5. Press Esc, press the shortcut again, click the icon again, or switch to
    another Mac window to stop relaying input and request key release.

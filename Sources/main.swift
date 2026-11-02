@@ -389,7 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         let alert = NSAlert()
         alert.messageText = L("用 Mac 键盘给 iPhone 打字")
         alert.informativeText = L("1. 允许手机键盘使用蓝牙。\n2. iPhone 打开“设置 → 蓝牙”，选择这台 Mac 的名称并完成配对。\n3. 在 iPhone 的备忘录等 App 中点一下文字输入位置。\n4. 回到 Mac，点“开始输入”后打字；按 Esc 停止。\n\n中文使用 iPhone 的输入法，可点“切换手机输入法”发送切换快捷键。两个 Apple ID 无需更改。")
-            + "\n\n" + L("日常使用：点击菜单栏图标或按 ⌃⌥K，切换手机输入。实心图标表示正在手机输入，灰色轮廓表示本机输入。按 Esc 或切到其他窗口也会停止。右键图标可打开完整设置。")
+            + "\n\n" + L("日常使用：点击菜单栏图标或按 ⌃⌥K，切换手机输入。白色线条亮起表示正在手机输入，图标变灰表示本机输入。按 Esc 或切到其他窗口也会停止。右键图标可打开完整设置。")
         alert.addButton(withTitle: L("知道了"))
         alert.runModal()
     }

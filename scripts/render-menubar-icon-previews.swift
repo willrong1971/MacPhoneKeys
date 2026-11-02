@@ -12,7 +12,7 @@ enum MenuBarIconPreviews {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         for scale in [1, 2] {
             for active in [false, true] {
-                let bitmap = glyph(active: active, color: .black, scale: scale)
+                let bitmap = glyph(active: active, opacity: active ? 1 : 0.78, scale: scale)
                 try save(bitmap, at: output.appendingPathComponent("\(active ? "active" : "inactive")-\(scale)x.png"))
             }
             try save(contactSheet(scale: scale), at: output.appendingPathComponent("contact-\(scale)x.png"))
@@ -39,12 +39,11 @@ enum MenuBarIconPreviews {
         return bitmap
     }
 
-    private static func glyph(active: Bool, color: NSColor, scale: Int) -> NSBitmapImageRep {
+    private static func glyph(active: Bool, opacity: CGFloat, scale: Int) -> NSBitmapImageRep {
         bitmap(size: NSSize(width: 28, height: 20), scale: scale) {
             let bounds = NSRect(x: 0, y: 0, width: 28, height: 20)
-            MenuBarIcon.image(active: active).draw(in: bounds)
-            color.setFill()
-            bounds.fill(using: .sourceIn)
+            MenuBarIcon.image(active: active).draw(in: bounds, from: .zero,
+                                                 operation: .sourceOver, fraction: opacity)
         }
     }
 
@@ -63,15 +62,14 @@ enum MenuBarIconPreviews {
                 for active in [false, true] {
                     let column: CGFloat = active ? 170 : 20
                     let alpha: CGFloat = active ? 1 : 0.78
-                    let color = foreground.withAlphaComponent(alpha)
                     let image = NSImage(size: NSSize(width: 28, height: 20))
-                    image.addRepresentation(glyph(active: active, color: color, scale: 10))
+                    image.addRepresentation(glyph(active: active, opacity: alpha, scale: 10))
                     image.draw(in: NSRect(x: origin + column + 5, y: 241, width: 28, height: 20))
                     label(active ? "Active" : "Inactive · 78%", x: origin + column, y: 219,
                           color: foreground, size: 11)
                     image.draw(in: NSRect(x: origin + column, y: 80, width: 140, height: 100))
                 }
-                label("5× detail · transparent template mask", x: origin + 20, y: 42,
+                label("5× detail · black body, white linework", x: origin + 20, y: 42,
                       color: foreground.withAlphaComponent(0.78), size: 11)
             }
         }
