@@ -10,7 +10,7 @@ MacPhoneKeys stays in the **menu bar**, without a Dock icon. Left-click its icon
 
 Author: **九福爸爸 9fbaba**.
 
-Version **0.6.2 (11)** is a reliability candidate with a connection assistant, bounded app-service recovery and allowlisted diagnostic exports. Historical phone-side results do not validate a new candidate or a sandbox build. English, Simplified Chinese and Traditional Chinese follow the Mac's preferred supported languages, with English as the fallback.
+Version **0.6.3 (12)** is a reliability candidate with an explicit system Bluetooth assistant launch action and more accurate troubleshooting and diagnostic records. Historical phone-side results do not validate a new candidate or a sandbox build. English, Simplified Chinese and Traditional Chinese follow the Mac's preferred supported languages, with English as the fallback.
 
 Acceptance is performed by the current user alone; recruiting other testers is not a delivery requirement. See the [single-user acceptance plan](docs/Single-User-Acceptance.md), [App Store preparation](docs/AppStore-Readiness.md) and [privacy policy](docs/Privacy.en.md). A local sandbox candidate is not an approved App Store release.
 
@@ -38,6 +38,8 @@ The recorded reference setup was one Apple silicon Mac running **macOS 26.6.2** 
 Those phone-side typing results came from **0.2.0**. **0.4.1 (7)** fixed asynchronous activation and focus handling when starting input with full settings closed. The user then confirmed that workflow: the global shortcut started input, the complete `abc123` string appeared on the iPhone, and both stopping with the shortcut and switching to another Mac window returned the icon to its gray outline.
 
 **0.5.0 (8)** adds a revised vector menu bar icon and a saved **Show input hint window** setting. The user confirmed that with both full settings and the hint turned off, the global shortcut started phone input, the complete `abc123` string appeared on iPhone, the icon and stop controls behaved normally, and no hint window appeared.
+
+On the evening of November 2, 2026, the retained **0.6.2 (11)** installation recovered after the system Bluetooth assistant was launched manually. The system received a NumericComparison request and reported BLE pairing status 0; the user confirmed complete `abc123` output and a gray icon after stopping. Duplicate Mac entries on the phone later merged without intervention. No pairing records were deleted and the keyboard service was not rebuilt. This is one recovery result, not proof of long-term reliability or a phone test of 0.6.3. Offline checks and direct/sandbox Universal builds for 0.6.3 passed, and Chinese/English offline interfaces were inspected. Phone acceptance remains pending; the installed 0.6.2 app is unchanged.
 
 Other Mac models, Intel hardware, other macOS versions, other iPhones, Chinese candidate selection, other languages and keyboard layouts, and reconnection after sleep still need testing. These results are not a general compatibility guarantee.
 
@@ -80,7 +82,7 @@ Distributors must arrange their own appropriate signing and notarization. See [A
 ## Pair and type
 
 1. Open **MacPhoneKeys** on the Mac, find its app icon in the menu bar, and wait for the service to start.
-2. On the iPhone, open **Settings → Bluetooth** and select the **Mac's system name**. It may not appear as “MacPhoneKeys” or “MacKeys.” Follow the system pairing prompts and verify any displayed pairing code.
+2. When pairing is needed, first use the guide's **Start System Bluetooth Assistant…** action. Then open **Settings → Bluetooth** on the iPhone, select the **Mac's system name**, and compare the codes shown on both devices. The name may differ from “MacPhoneKeys” or “MacKeys.” If the assistant is unavailable, use the fallback pairing panel or Mac Bluetooth settings. The sandbox candidate provides only those fallback routes.
 3. Open Notes or another app on the iPhone and tap the text field where you want to type. Make sure its cursor is active.
 4. Once the connection is ready, left-click the Mac's menu bar icon or press **Control + Option + K**. Wait for the icon to become filled, then type using the built-in Mac keyboard or an external Bluetooth keyboard connected to the Mac. The input hint window is shown by default; you can turn it off in full settings.
 5. Press **Esc**, press the shortcut again, click the menu bar icon again, or switch to another Mac window to stop forwarding input and request key release.
@@ -150,14 +152,14 @@ To rebuild the app and make a disk image:
 zsh package.sh
 ```
 
-The default output is `build/手机键盘-0.6.2-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
+The default output is `build/手机键盘-0.6.3-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
 
 The disk image includes Chinese and English installation/usage instructions and the MIT license file, `LICENSE`.
 
 To package an existing app without rebuilding it:
 
 ```sh
-zsh package.sh build/手机键盘-0.6.2-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.6.3-通用版.dmg build/手机键盘.app
 ```
 
 Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eject the disk image after installation. If a release provides a prebuilt DMG, check that release's signing and notarization information before opening the app.
@@ -165,6 +167,12 @@ Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eje
 The packaging script checks that the app matches the version in `Resources/Info.plist`.
 
 ### Connection assistant and recovery in 0.6.x
+
+In direct builds, version 0.6.3 launches the OS-provided `BluetoothSetupAssistant` through `NSWorkspace` only after an explicit button press. It checks the fixed system path, bundle identifier and system ownership, does not search for a user-installed namesake, and never confirms pairing codes automatically. Launch confirmation has a 10-second timeout. A timeout displays the result and leaves fallback options available; it never starts an automatic retry. **Launching the assistant proves neither pairing nor visible phone text.**
+
+The helper's system path is not an Apple-guaranteed stable public pairing API and may change with macOS. The public `IOBluetoothPairingController` panel and Bluetooth settings remain available. App Store sandbox builds explicitly do not invoke the helper; they use only the public panel and settings. App Store submission remains deferred, and sandbox pairing and typing remain unverified.
+
+The guide now separates requested actions from recovery. Steps that require an app action must be requested before **Tried, Still Not Working** is available. Users can choose **Cannot Perform This Step** or export early. Reaching the diagnostic page does not mean every step was performed. Only a new test in the current guide, confirmed by the user on the phone, counts as verified completion.
 
 Version 0.6.2 adds guided troubleshooting for an undiscoverable Mac, pairing failure and a connected phone with no text. It checks local prerequisites, presents one current action and advances using user feedback. Manual service recovery has a 30-second cooldown. Before system sleep, tests and unsent input are cancelled; input must be started again after wake. Exhausted steps lead to diagnostics rather than an endless retry loop. These steps do not guarantee connection on every system.
 
@@ -176,7 +184,7 @@ Open **Connect iPhone…** from the menu bar menu. New users see the assistant o
 
 Service-registration and advertising errors or timeouts allow at most two automatic app-service recovery attempts. Waiting for a phone never causes a restart loop. A user can request one explicit service recovery from the assistant. It does not change global Bluetooth or forget devices.
 
-**Export Diagnostics** uses the system save panel. Reports contain versions, state and fixed event summaries, not raw logs, device names, addresses, identifiers or typed text. They are not uploaded.
+**Export Diagnostics** uses the system save panel. Version 0.6.3 uses schema 2: fixed enums record helper launch state, requested actions, skipped steps and the exit reason, with explicit current-guide, app-session or transport-instance scopes. Reports contain versions, state and fixed event summaries, not raw logs, device names, addresses, identifiers or typed text. They are not uploaded.
 
 ### Local Mac App Store sandbox candidate
 
@@ -199,7 +207,7 @@ The app enables input after the phone subscribes to an encrypted keyboard input 
 
 ### The counter increases, but no text appears
 
-Tap the intended text field on the iPhone again, confirm that its cursor is active, and check its hardware keyboard input method. If input still fails, open **Full Settings…**, click **Stop Keyboard Service**, then **Start Keyboard Service**. Wait for reconnection and try the supplied English test string with an English/US layout. Restarting only the app's service restored output in one 0.4.1 test; the root cause was not determined. Do not start by deleting pairing records or resetting global Bluetooth. The local counter and “submitted” messages do not prove that an iPhone app displayed the characters.
+Tap the intended text field on the iPhone again, confirm that its cursor is active, and check its hardware keyboard input method. If input still fails, open **Connect iPhone…**, choose the connected-but-no-text symptom, and follow the guide for a new phone text test. If the guide offers service recovery, request it once and wait for reconnection. Restarting only the app's service restored output in one 0.4.1 test; the root cause was not determined, so this is not a reason to restart repeatedly. Do not start by deleting pairing records or resetting global Bluetooth. The local counter and “submitted” messages do not prove that an iPhone app displayed the characters.
 
 ### Characters or punctuation differ from the Mac keyboard
 
@@ -264,6 +272,7 @@ After changing Simplified Chinese translations, run `xcrun swift scripts/generat
 | `Sources/GlobalHotKey.swift` | Global input-toggle shortcut and conflict handling. |
 | `Sources/KeyMapping.swift` | Mac key codes to HID usages. |
 | `Sources/BLEKeyboard.swift` | BLE HID services and bounded input queue. |
+| `Sources/SystemPairingAssistant.swift` / `Sources/TroubleshootingFlow.swift` | Explicit system-helper launch in direct builds, guided steps and exit reasons. |
 | `Sources/BluetoothKeyboard.swift` | Experimental Classic Bluetooth transport. |
 | `Tests/` | Checks that do not connect to a device. |
 | `Tests/AppPreferencesTests.swift` | Default and cross-instance persistence checks in an isolated preferences suite. |

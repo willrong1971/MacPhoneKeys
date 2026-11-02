@@ -44,6 +44,11 @@ xcrun swiftc -swift-version 5 -parse-as-library \
 "$checks_dir/PairingFlowTests"
 
 xcrun swiftc -swift-version 5 -parse-as-library \
+  "$project_dir/Sources/SystemPairingAssistant.swift" "$project_dir/Tests/SystemPairingAssistantTests.swift" \
+  -framework AppKit -o "$checks_dir/SystemPairingAssistantTests"
+"$checks_dir/SystemPairingAssistantTests"
+
+xcrun swiftc -swift-version 5 -parse-as-library \
   "$project_dir/Sources/PairingFlow.swift" "$project_dir/Sources/TroubleshootingFlow.swift" \
   "$project_dir/Tests/TroubleshootingFlowTests.swift" \
   -framework Foundation -o "$checks_dir/TroubleshootingFlowTests"

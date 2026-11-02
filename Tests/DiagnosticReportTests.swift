@@ -73,6 +73,33 @@ struct DiagnosticReportTests {
             logLines: [], version: "0.6.2", systemVersion: "26.6.2", architecture: "arm64")
         precondition((invalidGuide["troubleshooting"] as! [String: Any]).isEmpty)
         precondition((invalidGuide["connectionAssistant"] as! [String: Any]).isEmpty)
+        let honest = DiagnosticReportBuilder.make(snapshot: ["troubleshooting": [
+            "symptom": "pairingFailed", "step": "exportDiagnostics", "scope": "currentGuide",
+            "pairingRequested": false, "supportRequested": false, "serviceRecoveryUsed": false,
+            "exitReason": "unableToPerform", "skippedStep": "openMacPairing", "reasonText": "private-input"
+        ], "systemPairingAssistant": ["state": "launched", "scope": "appSession", "launchAttemptCount": 1,
+                                      "url": "/Users/private/path", "error": "private-error", "passkey": "private-passkey"]],
+            logLines: ["[12:00:00] System Bluetooth assistant launch state: launched; private-input"],
+            version: "0.6.3", systemVersion: "26.6.2", architecture: "arm64")
+        let honestGuide = honest["troubleshooting"] as! [String: Any]
+        precondition(honestGuide["pairingRequested"] as? Bool == false)
+        precondition(honestGuide["exitReason"] as? String == "unableToPerform")
+        precondition(honestGuide["skippedStep"] as? String == "openMacPairing")
+        let helper = honest["systemPairingAssistant"] as! [String: Any]
+        precondition(Set(helper.keys) == Set(["state", "scope", "launchAttemptCount"]))
+        precondition(helper["state"] as? String == "launched")
+        precondition((honest["state"] as! [String: Any])["connected"] == nil,
+                     "Launching the helper must not manufacture keyboard readiness")
+        let exported = String(decoding: try JSONSerialization.data(withJSONObject: honest), as: UTF8.self)
+        for secret in ["private-input", "/Users/private", "private-error", "private-passkey"] {
+            precondition(!exported.contains(secret))
+        }
+        let invalidHelper = DiagnosticReportBuilder.make(snapshot: ["systemPairingAssistant": [
+            "state": "private-state", "scope": "private-scope", "launchAttemptCount": -1],
+            "troubleshooting": ["exitReason": "private-reason", "skippedStep": "private-step", "scope": "private-scope"]],
+            logLines: [], version: "0.6.3", systemVersion: "26.6.2", architecture: "arm64")
+        precondition((invalidHelper["systemPairingAssistant"] as! [String: Any]).isEmpty)
+        precondition((invalidHelper["troubleshooting"] as! [String: Any]).isEmpty)
         print("Diagnostic privacy, confirmation boundaries, invalid inputs, and bounded export: passed")
     }
 }

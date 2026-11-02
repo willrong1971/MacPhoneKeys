@@ -1,8 +1,8 @@
 # Mac App Store 发行准备
 
-检查日期：2026-10-31。作者：九福爸爸 9fbaba。
+文档更新：2026-11-02；发行凭据检查日期：2026-10-31。作者：九福爸爸 9fbaba。
 
-本文件记录发行要求与待验证事项，不表示 App 已通过审核、已上传、已经公证或已完成沙盒真机验证。当前正常使用的安装版应继续保留，候选版另行验证。
+本文件记录发行要求与待验证事项，不表示 App 已通过审核、已上传、已经公证或已完成沙盒真机验证。按用户安排，App Store 上架继续暂缓。当前源码为 0.6.3 (12) 候选；本机 0.6.2 安装版恢复后保留，候选版另行验证。
 
 ## 两种交付物
 
@@ -13,7 +13,17 @@
 
 DMG 是直接分发安装盘。商店版本通过 Xcode 提供的发行技术打包上传，用户随后从 Mac App Store 安装。两者的构建和验收状态分别记录。[Apple 发行准备](https://developer.apple.com/documentation/xcode/preparing-your-app-for-distribution)、[上传构建](https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/)
 
-本机只读检查发现可用签名身份是 Apple Development，未发现本项目对应的 Mac App Store 配置描述文件。其他项目的证书或配置描述文件不能替代本项目的匹配配置。此次没有创建证书、读取私钥、操作开发者账户或上传软件。
+2026-10-31 本机只读检查发现可用签名身份是 Apple Development，未发现本项目对应的 Mac App Store 配置描述文件；该记录不代表后来已重新核查账户状态。其他项目的证书或配置描述文件不能替代本项目的匹配配置。此次没有创建证书、读取私钥、操作开发者账户或上传软件。
+
+## 0.6.3 直接安装与商店构建的差异
+
+直接安装构建增加用户主动点击的系统助理入口：通过公开 `NSWorkspace.openApplication` 启动 `/System/Library/CoreServices/BluetoothSetupAssistant.app`，先检查固定路径、Bundle ID `com.apple.BluetoothSetupAssistant` 和系统所有权。启动确认设 10 秒超时，不自动重试；公开配对面板和 Mac 蓝牙设置继续保留。启动接口公开不等于该系统助理路径是 Apple 保证稳定的公开配对 API，启动成功也不证明配对、键盘订阅或手机文字成功。
+
+**App Store 沙盒构建明确不调用该系统助理，只保留公开配对面板与设置。** 不能据此声称沙盒问题已解决或商店审核必定通过；0.6.3 沙盒配对与手机输入尚未验证。
+
+2026-11-02 晚的真实恢复发生在保留的 0.6.2 安装版：手动启动系统助理后出现 NumericComparison、BLE 配对状态 0，用户确认 `abc123` 完整及停止图标变灰。重复 Mac 条目自行归一，未删除配对或重建服务。它是直接安装环境的一次手动恢复，不是 0.6.3 集成入口或商店沙盒的验收结果。
+
+0.6.3 还修正向导的动作前置条件，区分无法执行、提前导出与已验证完成。schema 2 诊断只导出白名单状态、请求动作、固定结束原因及明确作用域，不导出设备身份、配对码或按键内容。当前版本的离线检查、直接安装与沙盒 Universal 构建、严格签名及中英文离线界面检查已通过，实机结果按[一人验收记录](Single-User-Acceptance.md)独立记录。
 
 Apple 说明：只使用不受限制权限的纯 Mac App，提交商店时可能不需要配置描述文件；TestFlight 始终需要。本项目的正式检查选择统一要求显式应用标识和匹配的商店配置描述文件，便于保持 App Store／TestFlight 发行配置一致。这是本项目的构建策略，不是对所有 Mac App 的通用要求。[TN3125：Provisioning Profiles](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles)
 
@@ -62,6 +72,7 @@ zsh scripts/package-appstore.sh build/store-release/手机键盘.app
 | --- | --- | --- |
 | BLE peripheral | CoreBluetooth 与 Bluetooth 沙盒权限均为公开接口 | 在沙盒内完成服务注册、实际广播、加密输入订阅和手机可见文字验证 |
 | 系统配对窗口 | `IOBluetoothPairingController` 是公开 API；0.6.1 由 Objective-C 薄桥调用其公开工厂创建窗口 | 确认沙盒内能找到目标手机、正常取消和完成配对；窗口成功不等于键盘订阅成功 |
+| 系统蓝牙助理 | 0.6.3 直接构建可由用户显式启动；固定系统路径不是稳定公开配对 API | 沙盒构建禁止该启动路径；只验证公开面板和设置，不沿用直接构建结果 |
 | BLE HID 服务 | 实现使用标准 HID UUID `1812` 的完整 128 位表达 | 必须实测当前系统；没有找到 Apple 对依赖 UUID 表达长度差异注册行为的支持承诺 |
 | 菜单栏 App | `LSUIElement` 是公开的 agent App 配置 | 菜单、完整设置、帮助、退出、首次连接向导均可发现和使用 |
 | 快捷键 | 当前使用公开的 `RegisterEventHotKey`，默认包含 Control 修饰键 | 在沙盒内验证注册、冲突提示、开始/停止与失焦释放；不扩展为全局按键监听 |
@@ -69,7 +80,7 @@ zsh scripts/package-appstore.sh build/store-release/手机键盘.app
 
 Apple 将短 UUID 和完整 UUID 定义为同一标识；完整 `00001812-0000-1000-8000-00805F9B34FB` 不是自定义服务。当前实现能在本机工作，尚不足以承诺所有系统均支持这一发布方式。[CBUUID](https://developer.apple.com/documentation/corebluetooth/cbuuid)
 
-Apple 的公开配对窗口说明没有保证其会修复本次出现的 BLE 入站“没有处理程序”错误。因此应通过公开接口进行对照验证，不能依赖系统助理的内部进程名、私有启动参数、自动确认配对码或关闭加密。[系统配对窗口](https://developer.apple.com/documentation/iobluetoothui/iobluetoothpairingcontroller)、[系统配对结果](https://developer.apple.com/documentation/iobluetoothui/iobluetoothpairingcontroller/getresults%28%29)
+Apple 的公开配对窗口说明没有保证其会修复本次出现的 BLE 入站“没有处理程序”错误。商店构建继续通过公开面板与设置独立验证，不依赖系统助理的内部路径或进程名。两种构建都不使用私有启动参数、自动确认配对码或关闭加密。[系统配对窗口](https://developer.apple.com/documentation/iobluetoothui/iobluetoothpairingcontroller)、[系统配对结果](https://developer.apple.com/documentation/iobluetoothui/iobluetoothpairingcontroller/getresults%28%29)
 
 `LSUIElement` 本身不表示不能提供前台界面。快捷键也存在系统版本行为差异，仍需逐版本实测。[Launch Services Keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html)、[Apple 关于快捷键修饰键的说明](https://developer.apple.com/forums/thread/763878)
 

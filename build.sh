@@ -26,7 +26,7 @@ mkdir -p "$staged_app/Contents/MacOS" "$staged_app/Contents/Resources" "$staging
 
 # Both architectures must use the same saved source snapshot, even if editing
 # continues while the first compiler is running.
-source_files=(Localization.swift AppPreferences.swift GlobalHotKey.swift CaptureActivation.swift MenuBarIcon.swift MenuBarController.swift KeyMapping.swift BluetoothKeyboard.swift BLELifecycle.swift BLEKeyboard.swift PairingFlow.swift TroubleshootingFlow.swift ConnectionAssistant.swift DiagnosticReport.swift DiagnosticReportExporter.swift SingleInstanceCoordinator.swift main.swift)
+source_files=(Localization.swift AppPreferences.swift GlobalHotKey.swift CaptureActivation.swift MenuBarIcon.swift MenuBarController.swift KeyMapping.swift BluetoothKeyboard.swift BLELifecycle.swift BLEKeyboard.swift PairingFlow.swift TroubleshootingFlow.swift SystemPairingAssistant.swift ConnectionAssistant.swift DiagnosticReport.swift DiagnosticReportExporter.swift SingleInstanceCoordinator.swift main.swift)
 for source_file in "${source_files[@]}"; do
   cp "$project_dir/Sources/$source_file" "$staging_dir/Sources/$source_file"
 done

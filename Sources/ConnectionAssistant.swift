@@ -6,6 +6,7 @@ protocol ConnectionAssistantDelegate: AnyObject {
     func connectionAssistantStartService()
     func connectionAssistantOpenBluetoothSettings()
     func connectionAssistantOpenSystemPairingSupport()
+    func connectionAssistantLaunchSystemPairingAssistant()
     func connectionAssistantWillOpenSystemPairing()
     func connectionAssistantDidFinishSystemPairing(_ result: PairingFlow.SystemPanelResult, rawCode: Int32?, elapsedMilliseconds: Int)
     func connectionAssistantRecoverService()
@@ -30,6 +31,8 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
     private weak var delegate: ConnectionAssistantDelegate?
     private var refreshTimer: Timer?
     private var lastFlow = PairingFlow()
+    private var systemAssistantState = SystemPairingAssistant.State.notRequested
+    private var usesSystemAssistant = false
     private var pairingController: IOBluetoothPairingController?
     private var troubleshooting = TroubleshootingFlow()
     var troubleshootingSnapshot: [String: Any] { troubleshooting.diagnosticSnapshot }
@@ -40,6 +43,7 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
     private var guideBackButton: NSButton!
     private var guideNextButton: NSButton!
     private var guideStillFailingButton: NSButton!
+    private var guideUnableButton: NSButton!
     private var phoneSection: NSStackView!
     private var verificationSection: NSStackView!
     private var recoverySection: NSStackView!
@@ -50,6 +54,7 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
     private let connectionValue = NSTextField(wrappingLabelWithString: "")
     private let phoneInstructions = NSTextField(wrappingLabelWithString: "")
     private let pairingFeedback = NSTextField(wrappingLabelWithString: "")
+    private let systemAssistantFeedback = NSTextField(wrappingLabelWithString: "")
     private let verificationValue = NSTextField(wrappingLabelWithString: "")
     private let recoveryValue = NSTextField(wrappingLabelWithString: "")
     private var startButton: NSButton!
@@ -187,15 +192,19 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         guidePrimaryButton = button("", #selector(performGuideAction))
         guideBackButton = button(L("上一步"), #selector(previousGuideStep))
         guideNextButton = button(L("下一步"), #selector(nextGuideStep))
-        guideStillFailingButton = button(L("已完成，仍不行"), #selector(guideStillFailing))
+        guideStillFailingButton = button(L("已尝试，仍不行"), #selector(guideStillFailing))
+        guideUnableButton = button(L("无法执行这一步"), #selector(unableToPerformGuideStep))
         let guideExport = button(L("结束并导出诊断…"), #selector(finishAndExport))
         let guide = section(L("按步骤继续"), views: [symptomChoices, guideStep, guideBody,
-            row([guidePrimaryButton]), row([guideBackButton, guideNextButton, guideStillFailingButton]), row([guideExport])])
+            row([guidePrimaryButton]), row([guideBackButton, guideNextButton, guideStillFailingButton]),
+            row([guideUnableButton, guideExport])])
         stack.addArrangedSubview(guide)
 
-        pairButton = button(L("打开系统配对窗口…"), #selector(openSystemPairing))
+        pairButton = button(L("备用配对窗口…"), #selector(openSystemPairing))
         settingsButton = button(L("Mac 蓝牙设置…"), #selector(openBluetoothSettings))
-        phoneSection = section(L("手机上的操作"), views: [phoneInstructions, pairingFeedback, connectionValue])
+        phoneSection = section(L("手机上的操作"), views: [phoneInstructions, systemAssistantFeedback, pairingFeedback, connectionValue,
+            row([pairButton, settingsButton]),
+            text(L("若看到两个同名 Mac，先保留记录并验证手机输入；不要仅为消除重复显示而忽略设备。"), size: 12, color: .secondaryLabelColor)])
         stack.addArrangedSubview(phoneSection)
 
         testButton = button(L("发送测试串…"), #selector(sendTest))
@@ -230,8 +239,11 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         ])
     }
 
-    func render(flow: PairingFlow, macName: String) {
+    func render(flow: PairingFlow, macName: String, assistantState: SystemPairingAssistant.State,
+                usesSystemAssistant: Bool) {
         lastFlow = flow
+        self.systemAssistantState = assistantState
+        self.usesSystemAssistant = usesSystemAssistant
         let observation = flow.observation
         previewLabel.stringValue = observation.isPreview ? L("界面预览，不连接手机；下列状态均为测试示例。") : ""
         previewLabel.isHidden = !observation.isPreview
@@ -256,8 +268,32 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         case .notOpened: pairingFeedback.stringValue = L("需要配对时打开系统窗口，只选择自己的 iPhone。已配对的手机可以直接点已有的 Mac 记录连接。")
         case .open: pairingFeedback.stringValue = L("系统配对处理中，请按系统提示操作。")
         case .cancelled: pairingFeedback.stringValue = L("已取消系统配对；键盘服务保持原状态。")
-        case .selectionPaired: pairingFeedback.stringValue = L("系统面板已完成配对；仍需等待手机订阅键盘。")
+        case .selectionPaired: pairingFeedback.stringValue = L("备用面板已返回；这不代表键盘已连接。请在手机点这台 Mac，等待下方连接状态更新。")
         case .failed: pairingFeedback.stringValue = L("系统配对窗口未完成，请使用 Mac 蓝牙设置并检查手机提示。")
+        }
+        if usesSystemAssistant {
+            switch assistantState {
+            case .notRequested:
+                systemAssistantFeedback.stringValue = L("先启动系统蓝牙助理，再在手机点这台 Mac。助理可能不显示独立窗口。")
+            case .launching:
+                systemAssistantFeedback.stringValue = L("正在请求启动系统蓝牙助理，请稍候。")
+            case .launched:
+                systemAssistantFeedback.stringValue = L("已收到系统蓝牙助理的启动确认。请在手机点这台 Mac，并核对两端配对码；启动成功不代表配对成功。")
+            case .confirmationTimedOut:
+                systemAssistantFeedback.stringValue = L("尚未收到系统助理的启动结果。请查看系统提示，或使用备用配对窗口；不会自动重复启动。")
+            case .unavailable, .unsupportedForStore:
+                systemAssistantFeedback.stringValue = L("当前无法使用系统蓝牙助理。请使用下方备用配对窗口或 Mac 蓝牙设置继续。")
+            case .failed:
+                systemAssistantFeedback.stringValue = L("系统未能启动蓝牙助理。可使用下方备用配对窗口，或导出诊断报告。")
+            case .previewBlocked:
+                systemAssistantFeedback.stringValue = L("界面预览，不启动系统助理，也不连接手机。")
+            }
+        }
+        systemAssistantFeedback.isHidden = !usesSystemAssistant
+        systemAssistantFeedback.textColor = .secondaryLabelColor
+        pairingFeedback.isHidden = usesSystemAssistant && flow.systemPanelResult == .notOpened
+        if flow.systemPanelResult != .notOpened {
+            pairingFeedback.stringValue = L("备用窗口：") + pairingFeedback.stringValue
         }
         pairingFeedback.textColor = .secondaryLabelColor
         connectionValue.stringValue = observation.keyboardReady ? L("已建立加密键盘通道；下一步请确认手机文字。") : L("等待手机订阅键盘；当前还不能发送输入。")
@@ -275,8 +311,8 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
             : L("此按钮每次只请求一次手动恢复。")
         recoveryValue.textColor = .secondaryLabelColor
         startButton.isEnabled = !observation.running && !observation.isPreview
-        pairButton.isEnabled = flow.canOpenSystemPairing
-        settingsButton.isEnabled = !observation.isPreview
+        pairButton.isEnabled = flow.canOpenSystemPairing && assistantState != .launching
+        settingsButton.isEnabled = !observation.isPreview && !flow.systemPanelOpen && assistantState != .launching
         testButton.isEnabled = flow.canSendTest
         visibleButton.isEnabled = flow.canConfirmPhoneText
         missingButton.isEnabled = flow.canConfirmPhoneText
@@ -308,14 +344,16 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
             default: body = L("正在准备本 App 的键盘服务，请稍候。页面会更新状态，不需要反复点击恢复。")
             }
         case .openMacPairing:
-            title = L("先打开 Mac 配对入口")
-            body = L("先点下方按钮。在 Mac 系统窗口选择自己的 iPhone；保持该窗口打开，必要时在手机“设置 → 蓝牙”中点这台 Mac，并核对两端配对码。请先读完这些操作再打开窗口。")
+            title = L("准备 Mac 接收配对请求")
+            body = usesSystemAssistant
+                ? L("先点“启动系统蓝牙助理”，再在 iPhone 的“设置 → 蓝牙”中点这台 Mac，并核对两端配对码。助理可能没有独立窗口；无法启动时，可使用下方备用入口。")
+                : L("请打开配对窗口，选择自己的 iPhone，并按两端系统提示操作；窗口返回成功仍不代表键盘已经连接。")
         case .findMac:
             title = L("在手机列表中找到 Mac")
-            body = L("保持 Mac 蓝牙设置打开。在手机进入“设置 → 蓝牙”；若未看到 Mac，退出该页面后重新进入。确实看到这台 Mac 后点“下一步”；仍找不到则点“已完成，仍不行”。")
+            body = L("在手机进入“设置 → 蓝牙”；若未看到 Mac，退出该页面后重新进入。确实看到这台 Mac 后点“下一步”；仍找不到则点“已尝试，仍不行”。")
         case .waitForKeyboard:
             title = L("等待手机建立键盘通道")
-            body = L("在手机点这台 Mac，并按两端系统提示核对配对码。手机显示“已连接”后，仍需等待本 App 收到加密键盘订阅；收到后会自动进入文字测试。")
+            body = L("如需重新配对，先点下方按钮准备 Mac，再在手机点这台 Mac，并核对两端配对码。手机显示“已连接”后，本 App 仍会等待键盘通道就绪，再自动进入文字测试。")
         case .testPhoneText:
             title = L("用本次新测试确认手机文字")
             body = L("连接通道已经就绪。请按下方说明准备空白备忘录，发送一次测试，再亲眼确认手机显示。已有连接或以前的测试成功，不能代替本次结果。")
@@ -324,7 +362,7 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
             body = L("此操作只重建本 App 的键盘服务，会暂时断开手机键盘通道。本轮最多做一次，然后按新的连接结果继续，不要反复重建。")
         case .waitAfterRecovery:
             title = L("等待恢复后的新连接")
-            body = L("服务恢复已请求。请在手机点这台 Mac 重新连接；新的加密键盘通道就绪后，会自动进入文字测试。仍连不上时，点“已完成，仍不行”继续系统与手机检查。")
+            body = L("服务恢复已请求。请在手机点这台 Mac 重新连接；新的加密键盘通道就绪后，会自动进入文字测试。仍连不上时，点“已尝试，仍不行”继续系统与手机检查。")
         case .systemSupport:
             title = L("检查系统与手机蓝牙页面")
             body = L("先打开并保持 Mac 蓝牙设置。你也可以手动在 iPhone 的“设置 → 蓝牙”中关闭蓝牙约 10 秒再开启，等待约 20 秒后重试；这会短暂断开手机的其他蓝牙配件，请自行决定是否执行。完成后点“下一步”重试，仍失败则导出诊断。")
@@ -333,14 +371,14 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
             body = L("本轮检查完成。关闭此窗口后，可用菜单栏图标或 ⌃⌥K 切换输入；再次按快捷键、按 Esc 或切到其他 Mac 程序会停止输入。")
         case .exportDiagnostics:
             title = L("停止重复尝试，保存诊断")
-            body = L("本轮建议步骤已完成，仍未确认恢复。请保存诊断报告，保留当前配对记录，便于根据证据继续处理。App 不会自动忘记设备或重置系统蓝牙。")
+            body = L("排查已停止。导出报告会区分已请求的操作、跳过的步骤和结束原因；到达此页不代表全部步骤已执行，也不代表连接已恢复。请保留当前配对记录。")
         }
         guideStep.stringValue = LF("当前步骤：%@", title)
         guideBody.stringValue = body
         symptomChoices.isHidden = step != .chooseSymptom
         phoneSection.isHidden = ![.openMacPairing, .findMac, .waitForKeyboard, .systemSupport].contains(step)
         verificationSection.isHidden = ![.testPhoneText, .finished].contains(step)
-        recoverySection.isHidden = ![.recoverService, .waitAfterRecovery, .exportDiagnostics].contains(step)
+        recoverySection.isHidden = ![.recoverService, .waitAfterRecovery].contains(step)
             && troubleshooting.primaryAction != .recoverService
         if step == .testPhoneText && !troubleshooting.sawCurrentTest {
             verificationValue.stringValue = L("本轮排查尚未完成新的手机文字测试，请发送后再确认。")
@@ -352,7 +390,7 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         switch action {
         case .startService: guidePrimaryButton.title = L("启动键盘服务")
         case .openBluetoothSettings: guidePrimaryButton.title = L("Mac 蓝牙设置…")
-        case .openSystemPairing: guidePrimaryButton.title = L("打开 Mac 配对入口…")
+        case .openSystemPairing: guidePrimaryButton.title = usesSystemAssistant ? L("启动系统蓝牙助理…") : L("打开 Mac 配对入口…")
         case .sendTest: guidePrimaryButton.title = L("发送测试串…")
         case .recoverService: guidePrimaryButton.title = L("重新建立键盘服务")
         case .systemSupport: guidePrimaryButton.title = L("打开 Mac 蓝牙设置继续检查…")
@@ -360,18 +398,21 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         case .none: guidePrimaryButton.title = ""
         }
         guidePrimaryButton.isHidden = action == .none
-        guidePrimaryButton.isEnabled = !flow.systemPanelOpen
-        if action == .openSystemPairing { guidePrimaryButton.isEnabled = flow.canOpenSystemPairing }
+        let busy = flow.systemPanelOpen || systemAssistantState == .launching || flow.verificationState == .sending
+        guidePrimaryButton.isEnabled = !busy
+        if action == .openSystemPairing { guidePrimaryButton.isEnabled = flow.canOpenSystemPairing && !busy }
         if action == .sendTest { guidePrimaryButton.isEnabled = flow.canSendTest }
         if action == .recoverService { guidePrimaryButton.isEnabled = flow.canRecoverService && !troubleshooting.recoveryUsed }
         if state.isPreview && [.startService, .openBluetoothSettings, .openSystemPairing, .recoverService, .systemSupport].contains(action) {
             guidePrimaryButton.isEnabled = false
         }
-        guideBackButton.isEnabled = troubleshooting.canGoBack && !flow.systemPanelOpen && flow.verificationState != .sending
-        guideNextButton.isEnabled = troubleshooting.canGoNext && !flow.systemPanelOpen && flow.verificationState != .sending
+        guidePrimaryButton.isEnabled = guidePrimaryButton.isEnabled && !busy
+        guideBackButton.isEnabled = troubleshooting.canGoBack && !busy
+        guideNextButton.isEnabled = troubleshooting.canGoNext && !busy
         guideStillFailingButton.isEnabled = (troubleshooting.canReportStillFailing || step == .waitAfterRecovery)
-            && !flow.systemPanelOpen && flow.verificationState != .sending
+            && !busy
             && state.phase != "registering" && state.phase != "recovering"
+        guideUnableButton.isEnabled = troubleshooting.canReportUnableToPerformStep && !busy
         if flow.recoveryCooldownRemainingSeconds > 0 {
             recoveryValue.stringValue = LF("请等待 %ld 秒后，再手动重建服务。", flow.recoveryCooldownRemainingSeconds)
         }
@@ -392,6 +433,10 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         else { troubleshooting.stillNotWorking() }
         delegate?.connectionAssistantNeedsRefresh()
     }
+    @objc private func unableToPerformGuideStep() {
+        troubleshooting.unableToPerformStep()
+        delegate?.connectionAssistantNeedsRefresh()
+    }
     @objc private func finishAndExport() {
         troubleshooting.finishWithDiagnostics()
         delegate?.connectionAssistantNeedsRefresh()
@@ -402,7 +447,12 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
         switch troubleshooting.primaryAction {
         case .startService: startService()
         case .openBluetoothSettings: openBluetoothSettings()
-        case .openSystemPairing: openSystemPairing()
+        case .openSystemPairing:
+            if usesSystemAssistant {
+                guard lastFlow.canOpenSystemPairing, systemAssistantState != .launching,
+                      troubleshooting.recordAction(.openSystemPairing) else { return }
+                delegate?.connectionAssistantLaunchSystemPairingAssistant()
+            } else { openSystemPairing() }
         case .sendTest: sendTest()
         case .recoverService: recoverService()
         case .systemSupport:
@@ -447,7 +497,7 @@ final class ConnectionAssistant: NSWindowController, NSWindowDelegate {
     @objc private func closeAssistant() { close() }
 
     @objc private func openSystemPairing() {
-        guard lastFlow.canOpenSystemPairing, pairingController == nil else { return }
+        guard lastFlow.canOpenSystemPairing, pairingController == nil, systemAssistantState != .launching else { return }
         _ = troubleshooting.recordAction(.openSystemPairing)
         delegate?.connectionAssistantWillOpenSystemPairing()
         let startedAt = Date()

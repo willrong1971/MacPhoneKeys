@@ -9,7 +9,8 @@ struct TroubleshootingFlow {
         case testPhoneText, recoverService, waitAfterRecovery, systemSupport, finished, exportDiagnostics
     }
     enum Action: String { case none, startService, openBluetoothSettings, openSystemPairing, sendTest, recoverService, systemSupport, exportDiagnostics }
-    enum Blocker { case stopped, permission, radio, preparing, failedService }
+    enum Blocker: Equatable { case stopped, permission, radio, preparing, failedService }
+    enum ExitReason: String { case requestedEarly, stepsExhausted, unableToPerform, completedVerified }
 
     struct Evidence {
         var running = false
@@ -30,12 +31,15 @@ struct TroubleshootingFlow {
     private(set) var supportRequested = false
     private(set) var testRequested = false
     private(set) var sawCurrentTest = false
+    private(set) var exitReason: ExitReason?
+    private(set) var skippedStep: Step?
     private var history: [Step] = []
     private var evidence = Evidence()
     private var reviewingPreviousStep = false
     private var testBaselineID: UUID?
     private var currentGuideTestID: UUID?
     private var recoveryBaselineGeneration: String?
+    private var attemptedPreparation: Blocker?
 
     var blocker: Blocker? {
         if !evidence.running { return .stopped }
@@ -59,6 +63,7 @@ struct TroubleshootingFlow {
         reviewingPreviousStep = false
         recoveryUsed = false; pairingRequested = false; supportRequested = false
         testRequested = false; sawCurrentTest = false
+        exitReason = nil; skippedStep = nil; attemptedPreparation = nil
         testBaselineID = nil; currentGuideTestID = nil; recoveryBaselineGeneration = nil
         switch symptom {
         case .firstConnection, .pairingFailed: step = .openMacPairing
@@ -69,14 +74,18 @@ struct TroubleshootingFlow {
 
     mutating func observe(_ next: Evidence) {
         let lostKeyboard = evidence.keyboardReady && !next.keyboardReady
+        let changedGeneration = evidence.generation != next.generation
         evidence = next
-        if lostKeyboard { testRequested = false; sawCurrentTest = false; currentGuideTestID = nil }
-        if testRequested, let id = next.verificationAttemptID, id != testBaselineID,
+        if lostKeyboard || changedGeneration || blocker != nil {
+            testRequested = false; sawCurrentTest = false; currentGuideTestID = nil
+        }
+        if testRequested, blocker == nil, next.keyboardReady,
+           let id = next.verificationAttemptID, id != testBaselineID,
            ["sending", "awaitingUser"].contains(next.verification) {
             sawCurrentTest = true; currentGuideTestID = id
         }
         if symptom != nil && blocker == nil && next.keyboardReady && !reviewingPreviousStep {
-            if [.openMacPairing, .findMac, .waitForKeyboard].contains(step)
+            if [.openMacPairing, .findMac, .waitForKeyboard, .systemSupport].contains(step)
                 || step == .waitAfterRecovery && freshRecoveryConnection {
                 move(to: .testPhoneText)
             }
@@ -84,7 +93,8 @@ struct TroubleshootingFlow {
                 && next.verificationAttemptID == currentGuideTestID {
                 move(to: .finished)
             }
-        } else if step == .finished && lostKeyboard {
+        }
+        if step == .finished && (lostKeyboard || changedGeneration || blocker != nil) {
             move(to: .waitForKeyboard)
         }
     }
@@ -115,6 +125,7 @@ struct TroubleshootingFlow {
     mutating func recordAction(_ action: Action) -> Bool {
         guard action != .none, action == primaryAction else { return false }
         reviewingPreviousStep = false
+        if displayedStep == .checkMac { attemptedPreparation = blocker }
         switch action {
         case .openSystemPairing: pairingRequested = true
         case .recoverService:
@@ -128,7 +139,7 @@ struct TroubleshootingFlow {
             testRequested = true; sawCurrentTest = false
             testBaselineID = evidence.verificationAttemptID; currentGuideTestID = nil
         case .systemSupport: supportRequested = true
-        case .exportDiagnostics: move(to: .exportDiagnostics)
+        case .exportDiagnostics: finishWithDiagnostics()
         default: break
         }
         return true
@@ -139,6 +150,7 @@ struct TroubleshootingFlow {
         guard let previous = history.popLast() else { return }
         step = previous
         reviewingPreviousStep = true
+        exitReason = nil; skippedStep = nil
         // The action budget is not reset, and no action is replayed.
     }
 
@@ -166,7 +178,28 @@ struct TroubleshootingFlow {
     }
 
     var canReportStillFailing: Bool {
-        symptom != nil && ![.chooseSymptom, .finished, .exportDiagnostics, .waitAfterRecovery].contains(displayedStep)
+        guard symptom != nil else { return false }
+        switch displayedStep {
+        case .chooseSymptom, .finished, .exportDiagnostics, .waitAfterRecovery: return false
+        case .checkMac: return blocker != nil && attemptedPreparation == blocker && primaryAction != .none
+        case .openMacPairing: return pairingRequested
+        case .systemSupport: return supportRequested
+        case .recoverService: return recoveryUsed
+        case .testPhoneText: return testRequested
+        case .findMac, .waitForKeyboard: return true
+        }
+    }
+
+    var canReportUnableToPerformStep: Bool {
+        symptom != nil && ![.chooseSymptom, .finished, .exportDiagnostics].contains(displayedStep)
+    }
+
+    /// Explicitly records a skipped step; it never stands in for a completed action.
+    mutating func unableToPerformStep() {
+        guard canReportUnableToPerformStep else { return }
+        skippedStep = displayedStep
+        exitReason = .unableToPerform
+        move(to: .exportDiagnostics)
     }
 
     mutating func stillNotWorking() {
@@ -192,7 +225,7 @@ struct TroubleshootingFlow {
     }
 
     func allowsConfirmation(attemptID: UUID?) -> Bool {
-        step == .testPhoneText && evidence.keyboardReady && sawCurrentTest
+        step == .testPhoneText && blocker == nil && evidence.keyboardReady && sawCurrentTest
             && attemptID != nil && attemptID == currentGuideTestID
     }
 
@@ -201,7 +234,12 @@ struct TroubleshootingFlow {
         move(to: supportOrDiagnostics)
     }
 
-    mutating func finishWithDiagnostics() { move(to: .exportDiagnostics) }
+    /// Exporting is allowed at any point, including when the save sheet is later
+    /// cancelled. Neither entering this page nor saving a file verifies recovery.
+    mutating func finishWithDiagnostics() {
+        if exitReason == nil { exitReason = .requestedEarly }
+        move(to: .exportDiagnostics)
+    }
 
     private var supportOrDiagnostics: Step { supportRequested ? .exportDiagnostics : .systemSupport }
     private var freshRecoveryConnection: Bool {
@@ -209,12 +247,22 @@ struct TroubleshootingFlow {
     }
 
     var diagnosticSnapshot: [String: Any] {
-        ["symptom": symptom?.rawValue ?? "notSelected", "step": displayedStep.rawValue,
-         "serviceRecoveryUsed": recoveryUsed]
+        var snapshot: [String: Any] = [
+            "scope": "currentGuide", "symptom": symptom?.rawValue ?? "notSelected",
+            "step": displayedStep.rawValue, "serviceRecoveryUsed": recoveryUsed,
+            "pairingRequested": pairingRequested, "supportRequested": supportRequested
+        ]
+        if let exitReason { snapshot["exitReason"] = exitReason.rawValue }
+        if let skippedStep { snapshot["skippedStep"] = skippedStep.rawValue }
+        return snapshot
     }
 
     private mutating func move(to next: Step) {
         guard step != next else { return }
+        if next == .finished { exitReason = .completedVerified }
+        else if next == .exportDiagnostics {
+            if exitReason == nil { exitReason = .stepsExhausted }
+        } else { exitReason = nil; skippedStep = nil }
         history.append(step)
         step = next
     }

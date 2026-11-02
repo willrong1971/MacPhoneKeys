@@ -55,6 +55,14 @@ enum DiagnosticReportBuilder {
                 assistant["recoveryCooldownRemainingSeconds"] = remaining
             }
         }
+        var systemAssistant: [String: Any] = [:]
+        if let source = snapshot["systemPairingAssistant"] as? [String: Any] {
+            if let value = source["state"] as? String,
+               ["notRequested", "launching", "launched", "unavailable", "failed", "confirmationTimedOut",
+                "unsupportedForStore", "previewBlocked"].contains(value) { systemAssistant["state"] = value }
+            if source["scope"] as? String == "appSession" { systemAssistant["scope"] = "appSession" }
+            if let count = nonnegativeInteger(source["launchAttemptCount"]) { systemAssistant["launchAttemptCount"] = count }
+        }
         var guide: [String: Any] = [:]
         if let source = snapshot["troubleshooting"] as? [String: Any] {
             if let symptom = source["symptom"] as? String,
@@ -66,12 +74,22 @@ enum DiagnosticReportBuilder {
                 "recoverService", "waitAfterRecovery", "systemSupport", "finished", "exportDiagnostics"].contains(step) {
                 guide["step"] = step
             }
-            if let used = source["serviceRecoveryUsed"] as? Bool { guide["serviceRecoveryUsed"] = used }
+            for key in ["serviceRecoveryUsed", "pairingRequested", "supportRequested"] {
+                if let value = source[key] as? Bool { guide[key] = value }
+            }
+            if source["scope"] as? String == "currentGuide" { guide["scope"] = "currentGuide" }
+            if let value = source["exitReason"] as? String,
+               ["requestedEarly", "stepsExhausted", "unableToPerform", "completedVerified"].contains(value) {
+                guide["exitReason"] = value
+            }
+            if let value = source["skippedStep"] as? String,
+               ["checkMac", "openMacPairing", "findMac", "waitForKeyboard", "testPhoneText", "recoverService",
+                "waitAfterRecovery", "systemSupport"].contains(value) { guide["skippedStep"] = value }
         }
         let recent = Array(logLines.suffix(300))
         let events = recent.compactMap(event).suffix(100)
         return [
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "generatedAt": ISO8601DateFormatter().string(from: generatedAt),
             "appVersion": safeVersion(version),
             "systemVersion": safeVersion(systemVersion),
@@ -79,7 +97,10 @@ enum DiagnosticReportBuilder {
             "state": state,
             "transport": transport,
             "connectionAssistant": assistant,
+            "systemPairingAssistant": systemAssistant,
             "troubleshooting": guide,
+            "counterScopes": ["transport": "transportInstance", "systemPairingAssistant": "appSession",
+                              "troubleshooting": "currentGuide", "phoneTextVerification": "currentConnection"],
             "recentEvents": Array(events),
             "omittedUnclassifiedLogLines": recent.filter { event($0) == nil }.count,
             "privacy": ["containsInputContent": false, "containsDeviceIdentifiers": false,
@@ -117,6 +138,7 @@ enum DiagnosticReportBuilder {
             ("advertisingTimedOut", ["广播启动超时", "advertising startup timed out", "廣播啟動逾時"]),
             ("advertisingStarted", ["广播启动回调成功", "advertising started", "廣播啟動回呼成功"]),
             ("serviceRecovery", ["恢复蓝牙服务", "recovering bluetooth", "manual recovery of this app", "recovering this app's service", "恢復藍牙服務", "恢复尝试", "recovery attempt"]),
+            ("systemAssistantLaunch", ["系统蓝牙助理启动状态", "system bluetooth assistant launch state", "系統藍牙輔助程式啟動狀態"]),
             ("pairingPanel", ["系统配对", "system pairing", "系統配對"]),
             ("appStarted", ["启动；仅记录", "started; logs", "started; only connection events", "啟動；僅記錄"])
         ]

@@ -1,7 +1,16 @@
-MacPhoneKeys 0.6.2 (11) — Reliability candidate
+MacPhoneKeys 0.6.3 (12) — Reliability candidate
 Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
 
 VERSION 0.6.x CANDIDATE
+Version 0.6.3 adds Start System Bluetooth Assistant… to direct builds.
+When pairing is needed, use it before selecting the Mac in iPhone Bluetooth
+settings and comparing both pairing codes. The helper may have no separate
+window. Launch confirmation waits up to 10 seconds with no automatic retry;
+the fallback pairing panel and Mac Bluetooth settings remain available.
+Launching the helper does not establish pairing or visible phone text.
+Steps requiring an app action must be requested before Tried, Still Not
+Working is available. Choose Cannot Perform This Step if you cannot proceed,
+or export early. Reaching the export page does not mean all steps were done.
 Version 0.6.2 adds symptom-based troubleshooting under Connect iPhone… .
 Choose an undiscoverable Mac, pairing failure or missing phone text, follow
 the current step and report its result. Service recovery has a 30-second
@@ -14,13 +23,20 @@ can open it from the menu bar menu.
 Registration or advertising errors/timeouts allow at most two automatic
 app-service recovery attempts. Waiting for a phone never triggers a restart
 loop. Manual recovery changes only this app's service and retains pairing.
-Export Diagnostics saves allowlisted state and fixed event summaries. It
-excludes raw logs, device names, addresses, identifiers, paths and input
+Export Diagnostics uses schema 2 with allowlisted state, requested actions,
+skipped steps, exit reasons and fixed event summaries. Each record identifies
+its current-guide, app-session or transport-instance scope. It excludes raw
+logs, device names, addresses, identifiers, pairing codes, paths and input
 content. Nothing is uploaded automatically.
 Acceptance is performed by the current user alone. Historical 0.5.0 results
-do not validate this candidate. The App Store sandbox candidate requires
-separate phone testing and distribution configuration. This DMG is not an
-Apple-approved App Store release.
+do not validate this candidate. The App Store sandbox candidate does not call
+the system helper; it retains only the public pairing panel and settings.
+App Store submission remains deferred, and sandbox pairing and typing are
+unverified. This DMG is not an Apple-approved App Store release.
+The direct build launches the helper through NSWorkspace after checking its
+fixed system path, bundle identifier and system ownership. This helper path
+is not an Apple-guaranteed stable public pairing API and may be unavailable
+on another OS version; the fallback routes remain available.
 
 Use a Mac keyboard to type on an iPhone over Bluetooth. The devices may use
 different Apple IDs. No iPhone app is required.
@@ -46,7 +62,7 @@ interface does not switch immediately. This setting does not change the
 iPhone's input method or hardware-keyboard layout.
 
 INSTALLATION
-1. Open 手机键盘-0.6.2-通用版.dmg and drag the app to Applications.
+1. Open 手机键盘-0.6.3-通用版.dmg and drag the app to Applications.
 2. Open the app from Applications and allow Bluetooth access when prompted.
 3. Eject the disk image after installation. Run only one copy of the app.
 
@@ -61,8 +77,12 @@ https://github.com/willrong1971/MacPhoneKeys/blob/main/README.en.md
 PAIRING AND TYPING
 1. Open the Mac app. Its keyboard service starts automatically and its icon
    appears in the menu bar. The full settings window does not open by default.
-2. On the iPhone, open Settings > Bluetooth. Select your Mac's system name
-   and follow the pairing prompts. The name may differ from the app name.
+2. If pairing is needed, open Connect iPhone… from the menu bar menu and
+   follow the guide to start the system Bluetooth assistant. Then open
+   Settings > Bluetooth on the iPhone, select your Mac's system name and
+   compare both pairing codes. The name may differ from the app name.
+   If the helper is unavailable, use the fallback pairing panel or Mac
+   Bluetooth settings offered in the guide.
 3. Open Notes or another text editor on the iPhone. Tap a text field so that
    the insertion cursor is visible. Use an English/US hardware-keyboard layout
    for the first literal English test.
@@ -152,6 +172,15 @@ both full settings and the hint turned off, normal icon and stop behavior,
 and no hint window appearing.
 Other Macs, iPhones, OS versions, USB keyboards, non-ANSI layouts, sleep/wake
 reconnection and long-term reliability have not been comprehensively tested.
+On the evening of November 2, 2026, the retained 0.6.2 installation recovered
+after the system Bluetooth assistant was launched manually. The system
+received NumericComparison and reported BLE pairing status 0. The user saw
+complete abc123 output and a gray icon after stopping. Duplicate Mac entries
+merged without intervention; no pairing records were removed and the keyboard
+service was not rebuilt. This is a single 0.6.2 recovery result. Offline checks,
+direct/sandbox Universal builds and Chinese/English offline UI checks passed
+for 0.6.3. Phone testing remains pending; the existing 0.6.2 installation
+remains unchanged.
 
 The BLE Battery service reports a fixed 100% test value, not the Mac's battery
 level. Its PnP manufacturer field is an experimental placeholder.
@@ -161,11 +190,12 @@ If pairing or input fails, check that the app is running, its Bluetooth service
 is started, and Bluetooth access is allowed. Confirm that a text field is
 focused on the iPhone and its hardware-keyboard layout and input method match
 the intended test.
-If the app shows a connection but no text appears, open Full Settings… and
-click Stop Keyboard Service, then Start Keyboard Service. Wait for reconnection
-and try Send English Test, checking the result on the phone. Restarting only
-the app's service restored output in one 0.4.1 test; the root cause was not
-determined. Do not start by deleting pairing records or resetting global
+If the app shows a connection but no text appears, open Connect iPhone… and
+choose the connected-but-no-text symptom. Follow the guide for a new text
+test. If it offers service recovery, request it once and wait for reconnection,
+then check the result on the phone. Restarting only the app's service restored
+output in one 0.4.1 test; the root cause was not determined, so do not repeatedly
+restart it. Do not start by deleting pairing records or resetting global
 Bluetooth settings.
 
 No Dock icon or full window is expected by default. Find the app icon in

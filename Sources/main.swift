@@ -119,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var preferences = AppPreferences()
     var connectionAssistant: ConnectionAssistant?
     var pairingFlow = PairingFlow()
+    let systemPairingAssistant = SystemPairingAssistant()
     var assistantTestAttemptID: UUID?
     var inputHintCheckbox: NSButton!
     var globalHotKey: GlobalHotKey?
@@ -173,6 +174,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
         let shouldShowFirstConnection = !isLocalizationPreview && ConnectionAssistantOnboarding.shouldPresent(hasExistingUse: priorLogSize > 0)
         try? FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
         buildUI()
+        systemPairingAssistant.onChange = { [weak self] in
+            guard let self else { return }
+            self.appendLog(LF("系统蓝牙助理启动状态：%@；不代表手机已连接。", self.systemPairingAssistant.state.rawValue))
+            self.updateUI()
+        }
         if isLocalizationPreview { transport = PreviewKeyboardTransport() }
         attachTransportCallbacks()
         menuBar = MenuBarController(controller: self)
@@ -428,15 +434,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func refreshConnectionAssistant() {
         pairingFlow.observe(PairingFlow.Observation(snapshot: currentBLEDiagnosticSnapshot(), isPreview: isLocalizationPreview))
         let name = isLocalizationPreview ? L("这台 Mac") : Host.current().localizedName ?? L("这台 Mac")
-        connectionAssistant?.render(flow: pairingFlow, macName: name)
+        connectionAssistant?.render(flow: pairingFlow, macName: name,
+                                    assistantState: systemPairingAssistant.state,
+                                    usesSystemAssistant: !isAppStoreBuild)
     }
 
-    func connectionAssistantNeedsRefresh() { refreshConnectionAssistant() }
+    func connectionAssistantNeedsRefresh() { refreshConnectionAssistant(); writeState() }
     func connectionAssistantStartService() { startService(); refreshConnectionAssistant() }
     func connectionAssistantOpenBluetoothSettings() { guard !isLocalizationPreview else { return }; openBluetoothSettings() }
     func connectionAssistantOpenSystemPairingSupport() {
         guard !isLocalizationPreview else { return }
         openBluetoothSettings()
+    }
+    func connectionAssistantLaunchSystemPairingAssistant() {
+        refreshConnectionAssistant()
+        guard !isLocalizationPreview, pairingFlow.canOpenSystemPairing,
+              systemPairingAssistant.canLaunch else { return }
+        cancelTest(); endCapture()
+        let variant = Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysBuildVariant") as? String ?? "direct"
+        _ = systemPairingAssistant.launch(buildVariant: variant, isPreview: isLocalizationPreview,
+                                         keyboardReady: pairingFlow.observation.keyboardReady)
     }
     func connectionAssistantWillOpenSystemPairing() {
         cancelTest(); endCapture()
@@ -485,7 +502,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                         presentationWindow: connectionAssistant?.window ?? window)
     }
     func connectionAssistantShowFullSettings() { connectionAssistant?.close(); showSettings() }
-    func connectionAssistantDidClose() { cancelTest(); writeState() }
+    func connectionAssistantDidClose() {
+        cancelTest()
+        // willClose fires before isVisible changes. Persist the resulting state.
+        DispatchQueue.main.async { [weak self] in self?.writeState() }
+    }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showSettings()
@@ -871,6 +892,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                   "connectionAssistantVisible": connectionAssistant?.window?.isVisible ?? false,
                                   "phoneTextVerifiedByUser": pairingFlow.verificationState == .visibleByUser,
                                   "pairingAssistant": pairingFlow.diagnosticSnapshot,
+                                  "systemPairingAssistant": systemPairingAssistant.diagnosticSnapshot,
                                   "ble": bleSnapshot,
                                   "runningInstanceCount": SingleInstanceCoordinator.runningInstanceCount,
                                   "updatedAt": ISO8601DateFormatter().string(from: Date())]

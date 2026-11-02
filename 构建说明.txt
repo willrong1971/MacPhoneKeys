@@ -1,4 +1,4 @@
-手机键盘 / MacPhoneKeys 0.6.2 (11) 可靠性候选源码
+手机键盘 / MacPhoneKeys 0.6.3 (12) 可靠性候选源码
 
 需要完整 Xcode 或支持本项目 API 的 Xcode 命令行工具。
 
@@ -13,7 +13,7 @@
 
 0.4.1 (7) 修复关闭完整设置后从其他 Mac App 通过热键或图标启动手机输入的异步激活与焦点问题：等待 App 实际激活、取得输入焦点后才捕获并填充图标；取消或失焦会使待完成激活失效，迟到事件不会重新开启输入。用户已确认在关闭完整设置后，通过全局快捷键开始输入，iPhone 完整显示 abc123；再次按快捷键停止、切换到其他 Mac 窗口停止，图标均恢复灰色轮廓。
 0.5.0 (8) 增加菜单栏矢量图标与可保存的提示浮窗开关。用户已确认：完整设置与提示浮窗都关闭时，快捷键可开始手机输入，iPhone 完整显示 abc123，图标切换及停止正常，没有弹出提示浮窗。
-此前一次 0.4.1 固定测试串没有文字输出，在 App 内停止再启动蓝牙键盘服务后恢复，根因未确定。遇到已连接无字，先确认手机输入光标、布局与输入法，再尝试完整设置中的“停止蓝牙键盘”／“启动蓝牙键盘”，重新连接后用英文测试串核实；不要首先清除配对或重置全局蓝牙。
+此前一次 0.4.1 固定测试串没有文字输出，在 App 内停止再启动蓝牙键盘服务后恢复，根因未确定。遇到已连接无字，先确认手机输入光标、布局与输入法，再从“连接 iPhone…”选择对应问题，按向导测试；仅在向导提出时手动恢复一次服务，再检查手机文字，不反复停启。不要首先清除配对或重置全局蓝牙。
 
 隔离预览：
   python3 scripts/make-localization-previews.py build/手机键盘.app
@@ -25,12 +25,19 @@
 
 制作带 Applications 快捷方式的 DMG：
   zsh package.sh
-默认输出为 build/手机键盘-0.6.2-通用版.dmg。
+默认输出为 build/手机键盘-0.6.3-通用版.dmg。
 
 也可以为已有 App 打包：
-  zsh package.sh /绝对路径/手机键盘-0.6.2-通用版.dmg /绝对路径/手机键盘.app
+  zsh package.sh /绝对路径/手机键盘-0.6.3-通用版.dmg /绝对路径/手机键盘.app
 
-版本信息为 0.6.2，构建号为 11。打包脚本自动读取 Resources/Info.plist 并核对 App 版本。
+版本信息为 0.6.3，构建号为 12。打包脚本自动读取 Resources/Info.plist 并核对 App 版本。
+
+0.6.3 配对入口与诊断：
+直接安装构建在用户点击“启动系统蓝牙助理…”后，通过 NSWorkspace 打开 /System/Library/CoreServices/BluetoothSetupAssistant.app。启动前核对固定路径、解析后的路径、Bundle ID com.apple.BluetoothSetupAssistant 和系统所有权，不依赖同名程序查找。启动确认设 10 秒超时，不自动重试，不自动确认配对码。启动成功不表示配对成功、键盘通道就绪或手机实际收到文字。
+该路径属于系统实现细节，不是 Apple 保证稳定的公开配对 API。公开 IOBluetoothPairingController 面板和 Mac 蓝牙设置仍作为备用入口。appstore 构建不调用该助理，仅保留公开面板和设置，不将直接安装版的恢复结果当成商店可用证据。
+向导需先请求相应 App 操作，才允许反馈“已尝试，仍不行”；“无法执行这一步”与提前导出单独记录。schema 2 诊断只记录白名单固定枚举、请求动作、跳过步骤、结束原因及作用域：currentGuide、appSession、transportInstance。到达导出页不代表操作全部执行；不导出设备身份、配对码、输入内容或原始日志。
+
+2026-11-02 晚的实机结果来自保留的 0.6.2 (11)：手动启动系统蓝牙助理后出现 NumericComparison，BLE 配对状态为 0，用户确认 abc123 完整显示、停止后图标灰色。重复 Mac 条目自行归一，没有删除配对记录或重建键盘服务。0.6.3 离线检查、直接安装与沙盒 Universal 构建及严格签名检查通过；手机实测仍待进行，本机已安装的 0.6.2 保持原样。详见 docs/Single-User-Acceptance.md。
 
 0.6.0 新增连接向导、系统配对窗口入口、有界服务恢复、单实例保护和脱敏诊断导出。当前用户一人验收，计划见 docs/Single-User-Acceptance.md；0.5.0 的实测结果不能代替本候选版验证。
 
@@ -38,7 +45,7 @@
   MACPHONEKEYS_BUILD_VARIANT=appstore zsh build.sh build/appstore/手机键盘.app
   zsh scripts/validate-appstore.sh build/appstore/手机键盘.app --candidate
 
-商店构建启用 App Sandbox、Bluetooth 与用户选定文件权限，包含 PrivacyInfo.xcprivacy。发行签名、配置描述文件、商店打包与审核准备见 docs/AppStore-Readiness.md。普通 DMG 与商店交付物分别验收。
+商店构建启用 App Sandbox、Bluetooth 与用户选定文件权限，包含 PrivacyInfo.xcprivacy。发行签名、配置描述文件、商店打包与审核准备见 docs/AppStore-Readiness.md。普通 DMG 与商店交付物分别验收。商店提交继续暂缓，0.6.3 沙盒配对和手机输入尚未验证。
 
 签名：
 默认使用 ad-hoc 签名，仅适合开发检查。可以设置 MACPHONEKEYS_SIGN_IDENTITY 为钥匙串中已有证书的完整名称，再运行上述脚本。
@@ -58,6 +65,8 @@ Apple Development 证书不是 Developer ID 发行证书。脚本不会创建证
 新增源码与测试：
 Sources/AppPreferences.swift：显示输入提示浮窗的默认值与 UserDefaults 持久化。
 Sources/MenuBarIcon.swift：实心／轮廓“键盘 → 手机”菜单栏矢量图标。
+Sources/SystemPairingAssistant.swift：用户主动启动固定系统助理、超时及构建方式限制。
+Sources/TroubleshootingFlow.swift：动作请求、无法执行、提前结束和本轮文字验证边界。
 Tests/AppPreferencesTests.swift：独立偏好套件内验证缺省 true、false 跨实例持久化、恢复 true，不改真实用户偏好。
 
 作者：九福爸爸 9fbaba。采用 MIT License，具体条件见 LICENSE。

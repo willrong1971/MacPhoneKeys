@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("app")
 parser.add_argument("--output-dir", type=Path, default=project / "build/localization-previews")
 parser.add_argument("--show-assistant", action="store_true")
+parser.add_argument("--disconnected", action="store_true", help="Show an offline disconnected fixture")
 arguments = parser.parse_args()
 source = Path(arguments.app).resolve()
 output = arguments.output_dir.resolve()
@@ -40,6 +41,7 @@ for language in ("en", "zh-Hans", "zh-Hant"):
     info["CFBundleDevelopmentRegion"] = language
     info["MacPhoneKeysLocalizationPreview"] = True
     info["MacPhoneKeysPreviewShowAssistant"] = arguments.show_assistant
+    info["MacPhoneKeysPreviewDisconnected"] = arguments.disconnected
     info_path.write_bytes(plistlib.dumps(info))
     resources = target / "Contents/Resources"
     for folder in resources.glob("*.lproj"):
