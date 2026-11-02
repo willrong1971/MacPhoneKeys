@@ -19,10 +19,16 @@ import Foundation
             return PairingFlow.Observation(snapshot: snapshot, isPreview: preview)
         }
         let ready = observation(["phase": "ready", "isAdvertising": false, "reportSubscriberCount": 1, "inputReady": true])
-        var flow = PairingFlow()
+        var clock: TimeInterval = 100
+        var flow = PairingFlow(now: { clock })
         expect(!flow.observation.keyboardReady && !flow.canSendTest, "missing evidence is not a ready keyboard")
         flow.observe(observation())
         expect(flow.canOpenSystemPairing, "an advertising service may open the user-triggered system panel")
+        flow.observe(observation(["isAdvertising": false]))
+        expect(flow.canOpenSystemPairing, "advertising paused for an incoming connection must not hide the pairing entry")
+        flow.observe(observation(["authorization": "denied"]))
+        expect(!flow.canOpenSystemPairing, "pairing requires Bluetooth permission")
+        flow.observe(observation())
         expect(!flow.canConfirmPhoneText, "advertising cannot establish visible phone text")
         flow.systemPanelDidOpen()
         expect(!flow.canOpenSystemPairing && !flow.canRecoverService, "the system panel cannot be opened or recovered twice")
@@ -50,6 +56,7 @@ import Foundation
         expect(flow.verificationState == .notTested, "a subscription never claims phone text")
         expect(!flow.recordPhoneTextVisible(true), "manual confirmation requires a finished trial")
         let first = flow.beginTest()!
+        expect(flow.verificationAttemptID == first, "a test exposes its session-local identity")
         expect(flow.verificationState == .sending && !flow.canConfirmPhoneText, "a sending trial cannot yet be confirmed")
         expect(!flow.canSendTest && !flow.canRecoverService, "a second trial or recovery cannot interrupt the current trial through the assistant")
         expect(!flow.finishedSendingTest(UUID()), "an unrelated completion cannot complete this trial")
@@ -59,10 +66,12 @@ import Foundation
         expect(flow.diagnosticSnapshot["phoneTextVerifiedByUser"] as? Bool == false, "queue acceptance is not human validation")
         expect(flow.recordPhoneTextVisible(true, at: Date(timeIntervalSince1970: 100)), "an explicit person report is accepted")
         expect(flow.verificationState == .visibleByUser, "human validation is labeled separately")
+        expect(flow.verificationAttemptID == first, "confirmation retains the exact trial identity")
         expect(flow.diagnosticSnapshot["phoneTextVerifiedByUser"] as? Bool == true, "diagnostics retain the explicit user report")
         expect(!flow.recordPhoneTextVisible(false), "repeated confirmations cannot replace a completed trial")
         flow.observe(observation())
         expect(flow.verificationState == .notTested, "loss of subscription invalidates current validation")
+        expect(flow.verificationAttemptID == nil, "disconnection invalidates the trial identity")
         expect(flow.diagnosticSnapshot["lastUserReportAppliesToCurrentConnection"] as? Bool == false, "historical reports are not silently applied to a new connection")
         flow.observe(ready)
         expect(flow.verificationState == .notTested, "reconnection requires a new visible trial")
@@ -76,6 +85,11 @@ import Foundation
         expect(flow.verificationState == .notVisibleByUser, "failure feedback is not treated as transport failure or success")
         flow.serviceRecoveryRequested()
         expect(flow.verificationState == .notTested, "manual recovery invalidates the old trial immediately")
+        expect(!flow.canRecoverService && flow.recoveryCooldownRemainingSeconds == 30, "repeated recovery cannot tear down a new pairing immediately")
+        clock += 29
+        expect(!flow.canRecoverService && flow.recoveryCooldownRemainingSeconds == 1, "recovery cooldown uses elapsed monotonic time")
+        clock += 1
+        expect(flow.canRecoverService, "explicit recovery is available after the cooldown")
         let fourth = flow.beginTest()!
         flow.cancelTest(UUID())
         expect(flow.verificationState == .sending, "a stale cancellation cannot stop the current trial")

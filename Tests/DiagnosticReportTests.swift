@@ -58,6 +58,21 @@ struct DiagnosticReportTests {
         precondition(panel["systemPairingReturnCode"] as? Int == -1001, "SDK panel results include negative success/cancel codes")
         precondition(panel["systemPairingElapsedMilliseconds"] as? Int == 1200)
         precondition(panel["passkey"] == nil, "Pairing passkeys are never diagnostics")
+        let guided = DiagnosticReportBuilder.make(snapshot: ["troubleshooting": [
+            "symptom": "pairingFailed", "step": "systemSupport", "serviceRecoveryUsed": true,
+            "deviceName": "private-iPhone", "notes": "private-input"
+        ], "pairingAssistant": ["recoveryCooldownRemainingSeconds": 20]],
+            logLines: [], version: "0.6.2", systemVersion: "26.6.2", architecture: "arm64")
+        let guide = guided["troubleshooting"] as! [String: Any]
+        precondition(Set(guide.keys) == Set(["symptom", "step", "serviceRecoveryUsed"]))
+        precondition(guide["step"] as? String == "systemSupport")
+        precondition((guided["connectionAssistant"] as! [String: Any])["recoveryCooldownRemainingSeconds"] as? Int == 20)
+        let invalidGuide = DiagnosticReportBuilder.make(snapshot: ["troubleshooting": [
+            "symptom": "secret-symptom", "step": "private-step"
+        ], "pairingAssistant": ["recoveryCooldownRemainingSeconds": 31]],
+            logLines: [], version: "0.6.2", systemVersion: "26.6.2", architecture: "arm64")
+        precondition((invalidGuide["troubleshooting"] as! [String: Any]).isEmpty)
+        precondition((invalidGuide["connectionAssistant"] as! [String: Any]).isEmpty)
         print("Diagnostic privacy, confirmation boundaries, invalid inputs, and bounded export: passed")
     }
 }

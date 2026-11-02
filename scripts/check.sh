@@ -43,6 +43,12 @@ xcrun swiftc -swift-version 5 -parse-as-library \
   -framework Foundation -o "$checks_dir/PairingFlowTests"
 "$checks_dir/PairingFlowTests"
 
+xcrun swiftc -swift-version 5 -parse-as-library \
+  "$project_dir/Sources/PairingFlow.swift" "$project_dir/Sources/TroubleshootingFlow.swift" \
+  "$project_dir/Tests/TroubleshootingFlowTests.swift" \
+  -framework Foundation -o "$checks_dir/TroubleshootingFlowTests"
+"$checks_dir/TroubleshootingFlowTests"
+
 xcrun swiftc -swift-version 5 \
   "$project_dir/Sources/KeyMapping.swift" "$project_dir/Tests/KeyMappingTests.swift" \
   -o "$checks_dir/KeyMappingTests"

@@ -10,7 +10,7 @@ MacPhoneKeys stays in the **menu bar**, without a Dock icon. Left-click its icon
 
 Author: **九福爸爸 9fbaba**.
 
-Version **0.6.1 (10)** is a reliability candidate with a connection assistant, bounded app-service recovery and allowlisted diagnostic exports. Historical phone-side results do not validate a new candidate or a sandbox build. English, Simplified Chinese and Traditional Chinese follow the Mac's preferred supported languages, with English as the fallback.
+Version **0.6.2 (11)** is a reliability candidate with a connection assistant, bounded app-service recovery and allowlisted diagnostic exports. Historical phone-side results do not validate a new candidate or a sandbox build. English, Simplified Chinese and Traditional Chinese follow the Mac's preferred supported languages, with English as the fallback.
 
 Acceptance is performed by the current user alone; recruiting other testers is not a delivery requirement. See the [single-user acceptance plan](docs/Single-User-Acceptance.md), [App Store preparation](docs/AppStore-Readiness.md) and [privacy policy](docs/Privacy.en.md). A local sandbox candidate is not an approved App Store release.
 
@@ -150,14 +150,14 @@ To rebuild the app and make a disk image:
 zsh package.sh
 ```
 
-The default output is `build/手机键盘-0.6.1-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
+The default output is `build/手机键盘-0.6.2-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
 
 The disk image includes Chinese and English installation/usage instructions and the MIT license file, `LICENSE`.
 
 To package an existing app without rebuilding it:
 
 ```sh
-zsh package.sh build/手机键盘-0.6.1-通用版.dmg build/手机键盘.app
+zsh package.sh build/手机键盘-0.6.2-通用版.dmg build/手机键盘.app
 ```
 
 Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eject the disk image after installation. If a release provides a prebuilt DMG, check that release's signing and notarization information before opening the app.
@@ -165,6 +165,8 @@ Open the DMG in Finder, drag the app onto its **Applications** shortcut, and eje
 The packaging script checks that the app matches the version in `Resources/Info.plist`.
 
 ### Connection assistant and recovery in 0.6.x
+
+Version 0.6.2 adds guided troubleshooting for an undiscoverable Mac, pairing failure and a connected phone with no text. It checks local prerequisites, presents one current action and advances using user feedback. Manual service recovery has a 30-second cooldown. Before system sleep, tests and unsent input are cancelled; input must be started again after wake. Exhausted steps lead to diagnostics rather than an endless retry loop. These steps do not guarantee connection on every system.
 
 Version 0.6.1 uses a thin Objective-C bridge to call the documented pairing-controller factory, rather than relying on Swift’s inherited zero-argument initializer. Raw system-panel return codes and elapsed time are recorded without device or pairing identifiers.
 

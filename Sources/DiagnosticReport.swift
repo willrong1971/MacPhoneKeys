@@ -51,6 +51,22 @@ enum DiagnosticReportBuilder {
             if let elapsed = nonnegativeInteger(flow["systemPairingElapsedMilliseconds"]) {
                 assistant["systemPairingElapsedMilliseconds"] = elapsed
             }
+            if let remaining = nonnegativeInteger(flow["recoveryCooldownRemainingSeconds"]), remaining <= 30 {
+                assistant["recoveryCooldownRemainingSeconds"] = remaining
+            }
+        }
+        var guide: [String: Any] = [:]
+        if let source = snapshot["troubleshooting"] as? [String: Any] {
+            if let symptom = source["symptom"] as? String,
+               ["notSelected", "firstConnection", "macNotVisible", "pairingFailed", "connectedNoText"].contains(symptom) {
+                guide["symptom"] = symptom
+            }
+            if let step = source["step"] as? String,
+               ["chooseSymptom", "checkMac", "openMacPairing", "findMac", "waitForKeyboard", "testPhoneText",
+                "recoverService", "waitAfterRecovery", "systemSupport", "finished", "exportDiagnostics"].contains(step) {
+                guide["step"] = step
+            }
+            if let used = source["serviceRecoveryUsed"] as? Bool { guide["serviceRecoveryUsed"] = used }
         }
         let recent = Array(logLines.suffix(300))
         let events = recent.compactMap(event).suffix(100)
@@ -63,6 +79,7 @@ enum DiagnosticReportBuilder {
             "state": state,
             "transport": transport,
             "connectionAssistant": assistant,
+            "troubleshooting": guide,
             "recentEvents": Array(events),
             "omittedUnclassifiedLogLines": recent.filter { event($0) == nil }.count,
             "privacy": ["containsInputContent": false, "containsDeviceIdentifiers": false,

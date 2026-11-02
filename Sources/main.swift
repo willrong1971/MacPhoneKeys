@@ -127,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     var captureActivation = CaptureActivation()
     var advancingCaptureActivation = false
     var workspaceActivationObserver: NSObjectProtocol?
+    var workspaceSleepObserver: NSObjectProtocol?
     var waitingForHotKeyRelease = false
     var previewHotKeyPresses = 0
     var central: CBCentralManager?
@@ -183,6 +184,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                   app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
                   app.processIdentifier != self.menuBar.previousApplicationPID else { return }
             self.endCapture()
+        }
+        workspaceSleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.cancelTest()
+            self.endCapture()
+            self.transport.cancelPendingInput()
         }
         let shortcut = GlobalHotKey { [weak self] in
             guard let self else { return }
@@ -395,10 +404,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
 
     func currentBLEDiagnosticSnapshot() -> [String: Any] {
         if isLocalizationPreview {
+            let previewConnected = Bundle.main.object(forInfoDictionaryKey: "MacPhoneKeysPreviewDisconnected") as? Bool != true
             return ["running": true, "authorization": "allowedAlways", "radioState": "poweredOn",
                     "phase": "ready", "isAdvertising": true, "registeredServiceCount": 3,
-                    "requiredServiceCount": 3, "reportSubscriberCount": 1, "bootSubscriberCount": 0,
-                    "inputReady": true, "recoveryAttempt": 0, "recoveryLimit": 2,
+                    "requiredServiceCount": 3, "reportSubscriberCount": previewConnected ? 1 : 0, "bootSubscriberCount": 0,
+                    "inputReady": previewConnected, "recoveryAttempt": 0, "recoveryLimit": 2,
                     "generation": "offline-preview"]
         }
         var snapshot = (transport as? BLEKeyboard)?.diagnosticSnapshot ?? [:]
@@ -424,6 +434,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func connectionAssistantNeedsRefresh() { refreshConnectionAssistant() }
     func connectionAssistantStartService() { startService(); refreshConnectionAssistant() }
     func connectionAssistantOpenBluetoothSettings() { guard !isLocalizationPreview else { return }; openBluetoothSettings() }
+    func connectionAssistantOpenSystemPairingSupport() {
+        guard !isLocalizationPreview else { return }
+        openBluetoothSettings()
+    }
     func connectionAssistantWillOpenSystemPairing() {
         cancelTest(); endCapture()
         pairingFlow.systemPanelDidOpen()
@@ -860,6 +874,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
                                   "ble": bleSnapshot,
                                   "runningInstanceCount": SingleInstanceCoordinator.runningInstanceCount,
                                   "updatedAt": ISO8601DateFormatter().string(from: Date())]
+        if let guide = connectionAssistant?.troubleshootingSnapshot { state["troubleshooting"] = guide }
         if let preview = transport as? PreviewKeyboardTransport {
             // Aggregate fixture diagnostics only; never save characters or key codes.
             state["preview"] = ["reports": preview.reportCount, "releases": preview.releaseCount,
@@ -906,6 +921,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, CBCe
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) {
         if let observer = workspaceActivationObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        if let observer = workspaceSleepObserver { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
         globalHotKey?.unregister()
         menuBar?.remove()
         cancelTest(); endCapture(); transport.stop(); isStarted = false; isConnected = false; status = L("已退出"); writeState()

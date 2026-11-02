@@ -1,0 +1,103 @@
+import Foundation
+
+@main enum TroubleshootingFlowTests {
+    static func main() {
+        var checks = 0
+        func expect(_ value: Bool, _ message: String) {
+            checks += 1
+            guard value else { fatalError(message) }
+        }
+        var ready = TroubleshootingFlow.Evidence(running: true, permissionAllowed: true,
+            radioOn: true, servicesReady: true, phase: "ready", keyboardReady: false, verification: "notTested",
+            generation: "first")
+        var flow = TroubleshootingFlow()
+        flow.begin(.firstConnection)
+        expect(flow.displayedStep == .checkMac && flow.primaryAction == .startService, "local prerequisites take priority")
+        flow.observe(ready)
+        expect(flow.step == .openMacPairing && !flow.canGoNext, "first pairing requires the Mac entry before phone instructions")
+        expect(flow.recordAction(.openSystemPairing), "the user may request the public pairing entry")
+        flow.goNext()
+        expect(flow.step == .findMac, "requesting the Mac entry permits phone instructions without claiming pairing")
+        flow.goNext()
+        expect(flow.step == .waitForKeyboard && !flow.canGoNext, "Next never establishes an input subscription")
+        flow.stillNotWorking()
+        expect(flow.step == .systemSupport, "pairing failure goes to system guidance, not blind service resets")
+        flow.recordAction(.systemSupport); flow.goNext(); flow.goNext(); flow.stillNotWorking()
+        expect(flow.step == .exportDiagnostics, "a repeated pairing failure terminates with diagnostics")
+        expect(!flow.recordAction(.recoverService), "an export endpoint never retries in the background")
+
+        flow.begin(.macNotVisible)
+        expect(flow.step == .findMac, "the invisible-device branch starts with discoverability instructions")
+        flow.stillNotWorking()
+        expect(flow.step == .recoverService, "one explicit app service recovery may be offered")
+        expect(flow.recordAction(.recoverService) && flow.recoveryUsed, "recovery executes only after an explicit action")
+        expect(flow.step == .waitAfterRecovery, "recovery waits for a new subscription")
+        for _ in 0..<10 { flow.observe(ready) }
+        expect(flow.step == .waitAfterRecovery && flow.primaryAction == .none, "passive observations never create retry loops")
+        flow.recoveryStillFailed()
+        expect(flow.step == .systemSupport, "a failed app recovery offers one manual phone/system check")
+        flow.recordAction(.systemSupport); flow.stillNotWorking()
+        expect(flow.step == .exportDiagnostics, "a failed system/phone check reaches the diagnostic endpoint")
+        flow.goBack()
+        expect(flow.recoveryUsed && !flow.recordAction(.recoverService), "Back cannot replay or reset the recovery budget")
+
+        ready.keyboardReady = true
+        ready.verification = "visibleByUser"
+        ready.verificationAttemptID = UUID()
+        flow.observe(ready)
+        flow.begin(.connectedNoText)
+        flow.observe(ready)
+        expect(flow.step == .testPhoneText && flow.symptom == .connectedNoText, "a live subscription and old confirmation do not erase the no-text symptom")
+        flow.recordAction(.sendTest)
+        flow.observe(ready)
+        expect(flow.step == .testPhoneText, "requesting a test alert cannot reuse an old confirmation")
+        ready.verificationAttemptID = UUID()
+        ready.verification = "sending"; flow.observe(ready)
+        ready.verification = "awaitingUser"; flow.observe(ready)
+        expect(flow.step == .testPhoneText, "queued reports are not successful phone delivery")
+        ready.verification = "notVisibleByUser"; flow.observe(ready); flow.phoneTextReportedMissing()
+        expect(flow.step == .recoverService && flow.symptom == .connectedNoText, "user-reported missing text is preserved despite a live channel")
+        flow.recordAction(.recoverService)
+        flow.observe(ready)
+        expect(flow.step == .waitAfterRecovery && !flow.canGoNext,
+               "an unchanged old ready snapshot cannot complete recovery")
+        ready.keyboardReady = false; ready.verification = "notTested"; flow.observe(ready)
+        ready.keyboardReady = true; flow.observe(ready)
+        expect(flow.step == .waitAfterRecovery, "a temporary unsubscribe on the old generation cannot complete recovery")
+        ready.generation = "after-recovery"; flow.observe(ready)
+        expect(flow.step == .testPhoneText && flow.symptom == .connectedNoText, "a restored channel advances to text verification, not success")
+        flow.recordAction(.sendTest)
+        ready.verificationAttemptID = UUID()
+        ready.verification = "awaitingUser"; flow.observe(ready)
+        ready.verification = "visibleByUser"; flow.observe(ready)
+        expect(flow.step == .finished, "only a current completed trial and user confirmation finish the guide")
+        ready.keyboardReady = false; flow.observe(ready)
+        expect(flow.step == .waitForKeyboard, "a new disconnection invalidates the completed connection")
+
+        var stale = TroubleshootingFlow()
+        ready.keyboardReady = true; ready.verification = "awaitingUser"; ready.verificationAttemptID = UUID()
+        stale.observe(ready); stale.begin(.connectedNoText); stale.recordAction(.sendTest)
+        stale.observe(ready)
+        ready.verification = "visibleByUser"; stale.observe(ready)
+        expect(stale.step == .testPhoneText && !stale.sawCurrentTest,
+               "an old pending trial confirmed while the new test alert is open cannot finish the guide")
+        ready.verificationAttemptID = UUID(); ready.verification = "awaitingUser"; stale.observe(ready)
+        let currentTrial = ready.verificationAttemptID
+        ready.verificationAttemptID = UUID(); ready.verification = "visibleByUser"; stale.observe(ready)
+        expect(stale.step == .testPhoneText, "a different trial ID cannot confirm the observed current trial")
+        ready.verificationAttemptID = currentTrial; stale.observe(ready)
+        expect(stale.step == .finished, "the observed new trial and same-ID user confirmation finish normally")
+
+        flow.begin(.pairingFailed)
+        ready.permissionAllowed = false; flow.observe(ready)
+        expect(flow.displayedStep == .checkMac && flow.primaryAction == .openBluetoothSettings, "permission failure blocks pairing instructions")
+        expect(!flow.recordAction(.openSystemPairing), "blocked prerequisites cannot launch pairing")
+        ready.permissionAllowed = true; ready.phase = "registering"; ready.servicesReady = false; flow.observe(ready)
+        expect(flow.primaryAction == .none, "registration-in-progress is observed without a retry action")
+        ready.phase = "failed"; flow.observe(ready)
+        expect(flow.primaryAction == .recoverService, "a concrete local service failure offers an explicit repair")
+        let report = flow.diagnosticSnapshot
+        expect(Set(report.keys) == Set(["symptom", "step", "serviceRecoveryUsed"]), "diagnostic state contains only fixed enums and an action flag")
+        print("PASS: \(checks) guided troubleshooting transitions and no-blind-retry checks")
+    }
+}

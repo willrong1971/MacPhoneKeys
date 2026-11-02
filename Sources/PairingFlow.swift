@@ -62,6 +62,7 @@ struct PairingFlow {
     }
 
     private struct ManualReport {
+        let attemptID: UUID
         let visible: Bool
         let date: Date
         let epoch: Int
@@ -75,6 +76,17 @@ struct PairingFlow {
     private var connectionEpoch = 0
     private var testAttempt: TestAttempt?
     private var lastManualReport: ManualReport?
+    private let now: () -> TimeInterval
+    private var lastRecoveryAt: TimeInterval?
+
+    init(now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        self.now = now
+    }
+
+    var recoveryCooldownRemainingSeconds: Int {
+        guard let lastRecoveryAt else { return 0 }
+        return Int(ceil(min(30, max(0, lastRecoveryAt + 30 - now()))))
+    }
 
     mutating func observe(_ next: Observation) {
         // A new service generation or a lost/re-established input subscription
@@ -87,13 +99,15 @@ struct PairingFlow {
     }
 
     var canOpenSystemPairing: Bool {
-        observation.running && observation.radioOn && observation.servicesReady
-            && observation.isAdvertising && !observation.keyboardReady && !systemPanelOpen
+        observation.running && observation.authorization == "allowedAlways"
+            && observation.radioOn && observation.servicesReady
+            && !observation.keyboardReady && !systemPanelOpen
             && !observation.isPreview
     }
 
     var canRecoverService: Bool {
         observation.running && observation.radioOn && !systemPanelOpen
+            && recoveryCooldownRemainingSeconds == 0
             && observation.phase != "recovering"
             && observation.phase != "registering"
             && verificationState != .sending && !observation.isPreview
@@ -117,6 +131,14 @@ struct PairingFlow {
             return report.visible ? .visibleByUser : .notVisibleByUser
         }
         return .notTested
+    }
+
+    /// Session-local identity for the guide; never included in exported diagnostics.
+    var verificationAttemptID: UUID? {
+        guard observation.keyboardReady else { return nil }
+        if let attempt = testAttempt, attempt.epoch == connectionEpoch { return attempt.id }
+        if let report = lastManualReport, report.epoch == connectionEpoch { return report.attemptID }
+        return nil
     }
 
     mutating func systemPanelDidOpen() {
@@ -159,13 +181,14 @@ struct PairingFlow {
 
     @discardableResult
     mutating func recordPhoneTextVisible(_ visible: Bool, at date: Date = Date()) -> Bool {
-        guard canConfirmPhoneText else { return false }
-        lastManualReport = ManualReport(visible: visible, date: date, epoch: connectionEpoch)
+        guard canConfirmPhoneText, let attempt = testAttempt else { return false }
+        lastManualReport = ManualReport(attemptID: attempt.id, visible: visible, date: date, epoch: connectionEpoch)
         testAttempt = nil
         return true
     }
 
     mutating func serviceRecoveryRequested() {
+        lastRecoveryAt = now()
         connectionEpoch += 1
         testAttempt = nil
     }
@@ -173,6 +196,7 @@ struct PairingFlow {
     var diagnosticSnapshot: [String: Any] {
         var result: [String: Any] = [
             "systemPairingPanel": systemPanelResult.rawValue,
+            "recoveryCooldownRemainingSeconds": recoveryCooldownRemainingSeconds,
             "keyboardInputReady": observation.keyboardReady,
             "phoneTextVerification": verificationState.rawValue,
             "phoneTextVerifiedByUser": verificationState == .visibleByUser,
