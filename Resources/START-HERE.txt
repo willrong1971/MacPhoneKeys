@@ -1,0 +1,90 @@
+手机键盘 / MacPhoneKeys 0.6.3 (12) · 朋友试用版
+作者：九福爸爸 9fbaba · MIT License
+
+把这个 DMG 文件发给朋友即可。对方无需安装开发工具或自行编译。
+支持的构建目标：macOS 12.0 或更高版本，Intel 与 Apple 芯片 Mac。
+需要 Mac 与 iPhone 的蓝牙。两台设备的 Apple ID 无需相同，iPhone 无需安装 App。
+其他 Mac／iPhone／系统组合尚未全面实测，本包供试用和收集反馈。
+
+一、安装
+1. 打开安装盘，把“手机键盘.app”拖到“Applications（应用程序）”。
+2. 从“应用程序”打开它，不要直接在安装盘里长期运行。
+3. 本试用包尚未经过 Apple 公证；临时签名或开发签名不等于发行公证。
+   如果提示无法验证开发者或 Apple 无法检查：先尝试打开一次，再到
+   “系统设置 → 隐私与安全性”，找到本 App 的“仍要打开”。
+   确认是朋友发来的本包后，由使用者决定是否允许；旧版 macOS 位于
+   “系统偏好设置 → 安全性与隐私”。
+   如果没有该选项，或提示文件损坏／有害，请停止并联系作者。
+   无需关闭全局安全保护，不附带修改系统安全设置的脚本。
+4. 首次运行时，允许“手机键盘”使用蓝牙。App 常驻菜单栏，不占 Dock。
+   安装完成后可推出安装盘。使用时只运行一份 App。
+
+二、连接 iPhone
+1. 打开“连接 iPhone…”向导；首次运行会显示，也可右键菜单栏图标打开。
+2. 先在向导中点“启动系统蓝牙助理…”，助理可能没有独立窗口。
+3. 在 iPhone 打开“设置 → 蓝牙”，选择这台 Mac 的系统名称。
+   列表不一定显示“手机键盘”，也可能显示 MacKeys。
+4. 两端出现配对码时，核对一致后确认。等软件提示键盘已连接。
+5. 助理不可用时，使用向导中的备用配对窗口或 Mac 蓝牙设置。
+
+三、打字与停止
+1. 在 iPhone 备忘录新建空白笔记，点正文，确认光标闪烁；首次用英文输入法。
+2. 回到 Mac，按 Control + Option + K（⌃⌥K），或左键点击菜单栏图标。
+3. 黑色图标的白色线条亮起后，输入 abc123，确认手机完整显示。
+4. 再按 ⌃⌥K、按 Esc、点击图标或切到其他 Mac 窗口，即停止手机输入。
+   图标变灰表示回到本机输入。
+5. 右键图标打开“完整设置…”，可关闭“显示输入提示浮窗”。
+   关闭设置窗口后，App 和快捷键仍可使用。中文使用 iPhone 的输入法。
+
+四、连接不成功时
+右键图标 →“连接 iPhone…”，选择“找不到 Mac”“配对失败”或
+“已连接，但手机没有文字”，按向导当前的一步操作并反馈结果。
+无法执行时选择“无法执行这一步”；仍失败可导出诊断，附上 Mac 型号、
+macOS／iOS 版本及失败步骤发给作者。诊断不会自动上传。
+不要反复重建服务、忽略其他蓝牙设备或重置全部蓝牙记录。
+连接状态和按键计数不等于手机实际收到文字，请以手机显示为准。
+
+完整中文说明：安装与使用.txt
+English guide: Installation-and-Usage.en.txt
+源码与反馈：https://github.com/willrong1971/MacPhoneKeys
+Apple 首次打开说明：https://support.apple.com/en-us/102445
+
+------------------------------------------------------------
+ENGLISH QUICK START
+
+Trial build, macOS 12.0+, Universal for Intel and Apple silicon.
+No developer tools, iPhone app or matching Apple IDs are required.
+Other device and OS combinations have not been fully tested.
+
+Install: Drag 手机键盘.app to Applications, then open it there. This trial build
+has not been notarized by Apple. An ad-hoc or development signature does not
+replace Developer ID notarization. If macOS
+cannot verify it, first try opening the app, then check System Settings →
+Privacy & Security → Open Anyway for this app. On older macOS versions, use
+System Preferences → Security & Privacy. Approve only if you trust the source.
+If the option is missing or macOS reports damage or malware, contact the author.
+No script to disable system security is included or required. Allow Bluetooth
+when prompted. The app runs in the menu bar; run only one copy. Eject the disk
+image after installation.
+
+Pair: Open Connect iPhone… from the menu bar's right-click menu. Start the
+System Bluetooth Assistant, then select your Mac's system name (or MacKeys)
+in iPhone Settings → Bluetooth. Compare the codes on both devices. If the
+assistant is unavailable, use the fallback pairing panel or Mac Bluetooth settings.
+
+Type: In iPhone Notes, tap a text field and use an English keyboard layout for
+the first test. Back on the Mac, press Control + Option + K (⌃⌥K). When the
+icon's white lines brighten, type abc123 and check the phone. Press the shortcut
+again, press Esc, click the icon or switch to another Mac window to stop; the
+icon dims. Full Settings… includes Show input hint window. Closing full settings
+does not quit the app. Chinese text uses the iPhone's input method.
+
+Troubleshoot: Follow the symptom-based Connect iPhone… guide one step at a
+time. If a step is unavailable, report that. Export Diagnostics if needed and
+send it with your Mac model, macOS/iOS versions and failed step. Nothing uploads
+automatically. Do not repeatedly rebuild services or reset all Bluetooth records.
+Only text actually visible on the phone confirms delivery.
+
+Copyright (c) 2026 九福爸爸 9fbaba. MIT License.
+Source / feedback: https://github.com/willrong1971/MacPhoneKeys
+Apple opening guidance: https://support.apple.com/en-us/102445

@@ -33,7 +33,7 @@ payload="$staging_dir/payload"
 mkdir -p "$payload"
 ditto "$app_dir" "$payload/手机键盘.app"
 ln -s /Applications "$payload/Applications"
-for guide_file in 安装与使用.txt Installation-and-Usage.en.txt; do
+for guide_file in START-HERE.txt 安装与使用.txt Installation-and-Usage.en.txt; do
   if [[ -f "$project_dir/Resources/$guide_file" ]]; then
     cp "$project_dir/Resources/$guide_file" "$payload/$guide_file"
   fi

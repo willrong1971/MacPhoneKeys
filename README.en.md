@@ -39,7 +39,9 @@ Those phone-side typing results came from **0.2.0**. **0.4.1 (7)** fixed asynchr
 
 **0.5.0 (8)** adds a revised vector menu bar icon and a saved **Show input hint window** setting. The user confirmed that with both full settings and the hint turned off, the global shortcut started phone input, the complete `abc123` string appeared on iPhone, the icon and stop controls behaved normally, and no hint window appeared.
 
-On the evening of November 2, 2026, the retained **0.6.2 (11)** installation recovered after the system Bluetooth assistant was launched manually. The system received a NumericComparison request and reported BLE pairing status 0; the user confirmed complete `abc123` output and a gray icon after stopping. Duplicate Mac entries on the phone later merged without intervention. No pairing records were deleted and the keyboard service was not rebuilt. This is one recovery result, not proof of long-term reliability or a phone test of 0.6.3. Offline checks and direct/sandbox Universal builds for 0.6.3 passed, and Chinese/English offline interfaces were inspected. Phone acceptance remains pending; the installed 0.6.2 app is unchanged.
+On the evening of November 2, 2026, the retained **0.6.2 (11)** installation recovered after the system Bluetooth assistant was launched manually. The system received a NumericComparison request and reported BLE pairing status 0; the user confirmed complete `abc123` output and a gray icon after stopping. Duplicate Mac entries on the phone later merged without intervention. No pairing records were deleted and the keyboard service was not rebuilt. This is one recovery result, not proof of long-term reliability or a phone test of 0.6.3. Offline checks and direct/sandbox Universal builds for 0.6.3 passed, and Chinese/English offline interfaces were inspected. Visible phone-text acceptance for 0.6.3 remains pending.
+
+On November 3, 2026, the user authorized updating `/Applications/手机键盘.app` to **0.6.3 (12)**. Its files match the development-signed candidate at `b6a7d49`. Only one instance was running after installation; the existing pairing automatically reconnected with a keyboard input subscription, ⌃⌥K was registered, and both full settings and the input hint window were closed. The old app was archived as a ZIP. These observations verify installation and subscription state, not visible text on the iPhone in the new version.
 
 Other Mac models, Intel hardware, other macOS versions, other iPhones, Chinese candidate selection, other languages and keyboard layouts, and reconnection after sleep still need testing. These results are not a general compatibility guarantee.
 
@@ -154,7 +156,7 @@ zsh package.sh
 
 The default output is `build/手机键盘-0.6.3-通用版.dmg`. The script checks the Universal architectures and app signature and verifies the disk image. It does not automatically upload or notarize anything.
 
-The disk image includes Chinese and English installation/usage instructions and the MIT license file, `LICENSE`.
+The disk image includes a bilingual `START-HERE.txt`, full installation guides and the MIT license. Friends need no developer tools; the quick start covers first launch, Bluetooth permission, pairing and troubleshooting. An unnotarized trial may require the recipient to approve this app in system settings.
 
 To package an existing app without rebuilding it:
 

@@ -62,7 +62,8 @@ interface does not switch immediately. This setting does not change the
 iPhone's input method or hardware-keyboard layout.
 
 INSTALLATION
-1. Open 手机键盘-0.6.3-通用版.dmg and drag the app to Applications.
+1. Open the MacPhoneKeys DMG you received. Read START-HERE.txt, then drag
+   the app to Applications.
 2. Open the app from Applications and allow Bluetooth access when prompted.
 3. Eject the disk image after installation. Run only one copy of the app.
 
@@ -179,8 +180,9 @@ complete abc123 output and a gray icon after stopping. Duplicate Mac entries
 merged without intervention; no pairing records were removed and the keyboard
 service was not rebuilt. This is a single 0.6.2 recovery result. Offline checks,
 direct/sandbox Universal builds and Chinese/English offline UI checks passed
-for 0.6.3. Phone testing remains pending; the existing 0.6.2 installation
-remains unchanged.
+for 0.6.3. Version 0.6.3 was installed on November 3, 2026 and re-established
+an encrypted keyboard subscription automatically. Visible phone text on this
+version and long-term reconnection still need verification.
 
 The BLE Battery service reports a fixed 100% test value, not the Mac's battery
 level. Its PnP manufacturer field is an experimental placeholder.
